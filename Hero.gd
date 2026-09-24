@@ -13,8 +13,10 @@ const RETURN_SPEED := 225.0
 # รัศมีของ SightArea (เดิม 200 ใน Hero.tscn) — ขยาย 2 เท่าเพราะ World แนวตั้งแคบลง
 const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
-const HERO_SEPARATION_DISTANCE := 24.0
-const SEPARATION_PUSH_SPEED := 80.0
+# Hero ไม่ได้ชนกันด้วย collision (layer "heroes" ไม่อยู่ใน mask ของตัวเอง ตัว 240x320 จะดันกันจนเข้า formation ไม่ได้)
+# จึงใช้แรงผลักแบบนุ่มแทน: ใกล้กันกว่า HERO_SEPARATION_DISTANCE จะถูกดันออกทั้งแกน X/Y แรงขึ้นตามระยะที่ซ้อนกัน
+const HERO_SEPARATION_DISTANCE := 90.0
+const SEPARATION_PUSH_SPEED := 400.0
 const HERO_KNOCKBACK_CHANCE := 0.3
 const HERO_KNOCKBACK_DISTANCE := 65.0
 # ระยะเวลาที่ Enemy ถูกดันถอยหลัง = ระยะเวลาที่ Enemy ถูก stun ด้วย
@@ -38,6 +40,10 @@ var is_selected: bool = false
 # ลำดับการ recruit: ตัวแรกตั้งแต่ต้นเกม = 0, ตัวที่กด Recruit เพิ่มตามลำดับ = 1, 2, 3 (HeroParty เป็นคนตั้ง)
 var recruit_index: int = 0
 var state: HeroState = HeroState.SEEKING
+
+# ทุกเส้นทางการเดิน (ไล่ Enemy / formation / RETURNING / เดินขวา) ตั้งค่านี้ แล้วค่อยรวมกับแรงผลัก
+# และขยับจริงผ่าน move_and_slide() ครั้งเดียวต่อเฟรม
+var move_velocity := Vector2.ZERO
 
 var enemies_in_sight: Array[Node2D] = []
 var enemies_in_attack_range: Array[Node2D] = []
@@ -84,9 +90,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		select()
 
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if hp <= 0:
 		return
+
+	move_velocity = Vector2.ZERO
+	_update_ai(delta)
+	velocity = move_velocity + _get_separation_velocity()
+	move_and_slide()
+	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position)
+
+
+func _update_ai(delta: float) -> void:
 
 	# is_selected มีผลกับ AI แค่ตอนไม่มีการต่อสู้: ตัวที่ไม่ได้ถูกเลือกจะมี leash และ fallback กลับ formation slot
 	# ส่วน หา/ไล่/ต่อสู้ Enemy ด้านล่าง ทุกตัวรันอิสระของตัวเอง
@@ -104,7 +119,7 @@ func _process(delta: float) -> void:
 		if target:
 			_chase_enemy(target, delta)
 		elif is_selected:
-			_walk_forward(delta)
+			_walk_forward()
 		else:
 			_move_to_formation_slot(delta)
 		return
@@ -117,8 +132,13 @@ func _process(delta: float) -> void:
 
 
 # fallback ของ Hero ที่ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินไปทางขวาเรื่อยๆ
-func _walk_forward(delta: float) -> void:
-	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position + Vector2.RIGHT * MOVE_SPEED * delta)
+func _walk_forward() -> void:
+	move_velocity = Vector2.RIGHT * MOVE_SPEED
+
+
+# ตั้ง move_velocity ให้เดินเข้าหา target ด้วย speed แต่ไม่เลยเป้าในเฟรมนี้ (แทน move_toward เดิม)
+func _steer_toward(target: Vector2, speed: float, delta: float) -> void:
+	move_velocity = (target - global_position).limit_length(speed * delta) / delta
 
 
 # fallback ของ Hero ที่ไม่ได้ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินไป formation slot แล้วหยุดรอ
@@ -130,7 +150,7 @@ func _move_to_formation_slot(delta: float) -> void:
 	if global_position.distance_to(slot) < FORMATION_ARRIVE_DISTANCE:
 		return
 	# ใช้ RETURN_SPEED เพราะต้องเร็วกว่า leader ที่เดินขวาอยู่ ไม่งั้นจะตามไม่ทัน slot
-	global_position = global_position.move_toward(slot, RETURN_SPEED * delta)
+	_steer_toward(slot, RETURN_SPEED, delta)
 
 
 # คำนวณใหม่ทุกครั้งที่เรียก จึงอัปเดตเองเมื่อเปลี่ยนตัวที่เลือก / มีการ recruit / มี Hero ตาย
@@ -160,23 +180,28 @@ func _find_nearest_enemy_in_sight() -> Node2D:
 
 # เดินตรงเข้าหา Enemy ตามเวกเตอร์ทิศทางจริง (ทั้งแกน X และ Y) จนกว่าจะเข้า AttackArea
 func _chase_enemy(target: Node2D, delta: float) -> void:
-	var next_position := global_position.move_toward(target.global_position, MOVE_SPEED * delta)
-	global_position = WORLD_SCRIPT.clamp_to_bounds(next_position)
+	_steer_toward(target.global_position, MOVE_SPEED, delta)
 
 
-func _physics_process(_delta: float) -> void:
+func _get_separation_velocity() -> Vector2:
+	# ตัวที่กำลังตีอยู่ยืนหยัดที่เดิม ไม่ถูกดัน (ระยะตีสั้น ~60px ถ้าโดนดันจะหลุดระยะแล้วต้องเดินกลับเข้าไปใหม่ไม่จบ)
+	# ตัวที่กำลังเดินเข้ามาจะถูกดันเบี่ยงไปหาที่ว่างรอบ Enemy แทน
+	if state == HeroState.FIGHTING:
+		return Vector2.ZERO
 	var push := Vector2.ZERO
 	for hero in get_tree().get_nodes_in_group("heroes"):
-		if hero == self:
+		if hero == self or hero.hp <= 0:
 			continue
 		var offset: Vector2 = global_position - hero.global_position
 		var distance: float = offset.length()
-		if distance > 0.0 and distance < HERO_SEPARATION_DISTANCE:
-			push += offset.normalized()
-
-	push.x = 0.0
-	velocity = push * SEPARATION_PUSH_SPEED
-	move_and_slide()
+		if distance >= HERO_SEPARATION_DISTANCE:
+			continue
+		if distance < 0.01:
+			# ยืนทับจุดเดียวกันเป๊ะ ไม่มีทิศให้ดัน — แยกทิศตาม recruit_index ให้ทั้งคู่ดันออกคนละทาง
+			offset = Vector2.UP.rotated(recruit_index * TAU / 4.0)
+		# ยิ่งซ้อนมากยิ่งดันแรง (0 ที่ขอบระยะ → 1 ตอนทับกันสนิท)
+		push += offset.normalized() * (1.0 - distance / HERO_SEPARATION_DISTANCE)
+	return push * SEPARATION_PUSH_SPEED
 
 
 func _update_leash(delta: float) -> void:
@@ -198,7 +223,7 @@ func _update_leash(delta: float) -> void:
 
 	var slot := _get_formation_slot(leader)
 	if global_position.distance_to(slot) > RETURN_STOP_RANGE:
-		global_position = global_position.move_toward(slot, RETURN_SPEED * delta)
+		_steer_toward(slot, RETURN_SPEED, delta)
 	else:
 		state = HeroState.SEEKING
 		sight_area.monitoring = true
