@@ -8,11 +8,16 @@ const RECRUIT_OFFSET := 30.0
 # จุดเกิดในพิกัด World (ขนาด 14400x1280): ชิดซ้าย กึ่งกลางแนวตั้ง
 const BASE_POSITION := Vector2(1000, 640)
 
+# ตัวแรกตั้งแต่ต้นเกม = 0 ตัวที่ recruit เพิ่มได้ 1, 2, 3 ตามลำดับ
+var next_recruit_index := 0
+
 
 func _ready() -> void:
 	add_to_group("hero_party")
 
 	var hero: CharacterBody2D = HERO_SCENE.instantiate()
+	hero.recruit_index = next_recruit_index
+	next_recruit_index += 1
 	add_child(hero)
 	hero.global_position = BASE_POSITION
 	hero.select()
@@ -40,6 +45,8 @@ func recruit_hero() -> void:
 	var spawn_position: Vector2 = leader.global_position if leader else BASE_POSITION
 
 	var hero: CharacterBody2D = HERO_SCENE.instantiate()
+	hero.recruit_index = next_recruit_index
+	next_recruit_index += 1
 	add_child(hero)
 	hero.global_position = spawn_position + Vector2(0, RECRUIT_OFFSET)
 

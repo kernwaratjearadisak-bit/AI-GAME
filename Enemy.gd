@@ -4,7 +4,8 @@ const WALK_SPEED := 80.0
 const STOP_DISTANCE := 40.0
 const COIN_SCENE := preload("res://CoinPickup.tscn")
 const HP_POTION_SCENE := preload("res://HPPotionPickup.tscn")
-const HP_POTION_DROP_CHANCE := 0.5
+const HP_POTION_DROP_CHANCE := 0.25
+const WORLD_SCRIPT := preload("res://World.gd")
 # อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ใช้เป็นรัศมีของ DetectArea
 const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
 
@@ -16,6 +17,8 @@ var attack_damage: int = 5
 var attack_interval: float = 1.5
 var attack_timer: float = 0.0
 var target_hero: Node2D = null
+var is_knocked_back := false
+var knockback_tween: Tween = null
 
 var heroes_in_detect: Array[Node2D] = []
 
@@ -28,7 +31,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if hp <= 0:
+	# ระหว่างโดน knock-back = stun: ไม่เดิน ไม่โจมตี
+	if hp <= 0 or is_knocked_back:
 		return
 
 	# ไม่มี Hero ใน DetectArea (ยังไม่เคยเจอ หรือ Hero ออกนอกระยะไปแล้ว) = ยืนนิ่งที่ตำแหน่งปัจจุบัน
@@ -67,6 +71,17 @@ func _attack_target(delta: float) -> void:
 	if attack_timer >= attack_interval:
 		attack_timer = 0.0
 		target_hero.take_damage(attack_damage)
+
+
+func apply_knockback(offset: Vector2, duration: float) -> void:
+	if knockback_tween and knockback_tween.is_valid():
+		knockback_tween.kill()
+	is_knocked_back = true
+	attack_timer = 0.0
+	var destination := WORLD_SCRIPT.clamp_to_bounds(global_position + offset)
+	knockback_tween = create_tween()
+	knockback_tween.tween_property(self, "global_position", destination, duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	knockback_tween.finished.connect(func() -> void: is_knocked_back = false)
 
 
 func take_damage(amount: int) -> void:

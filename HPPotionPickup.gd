@@ -1,7 +1,7 @@
 extends Node2D
 
 const MOVE_DURATION := 0.4
-const HP_POTION_HEAL_AMOUNT := 20
+const HP_POTION_HEAL_AMOUNT := 15
 
 var start_position := Vector2.ZERO
 var has_start_position := false

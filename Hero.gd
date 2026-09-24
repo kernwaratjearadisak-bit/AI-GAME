@@ -4,9 +4,9 @@ enum HeroState { SEEKING, FIGHTING, RETURNING }
 
 const SELECT_HALF_SIZE := Vector2(120, 160)
 const RETURN_LEASH_RANGE := 300.0
-# เมื่อเข้า RETURNING แล้ว ให้เดินกลับจนเข้าใกล้ leader ระยะนี้ก่อนค่อยกลับไปหา Enemy
-# (ถ้าหยุดที่ขอบ 300 พอดี จะสลับ RETURNING/SEEKING ไปมาทุกเฟรม)
-const RETURN_STOP_RANGE := 150.0
+# เมื่อเข้า RETURNING แล้ว ให้เดินกลับจนเข้าใกล้ formation slot ระยะนี้ก่อนค่อยกลับไปหา Enemy
+# slot ห่าง leader 150 → หยุดที่ ≤ 200 จาก leader ต่ำกว่า RETURN_LEASH_RANGE พอ ไม่สลับ RETURNING/SEEKING ไปมาทุกเฟรม
+const RETURN_STOP_RANGE := 50.0
 const MOVE_SPEED := 150.0
 # ต้องเร็วกว่า MOVE_SPEED ไม่งั้นจะไม่มีวันตามทัน leader ที่กำลังเดินขวาอยู่
 const RETURN_SPEED := 225.0
@@ -15,6 +15,13 @@ const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
 const HERO_SEPARATION_DISTANCE := 24.0
 const SEPARATION_PUSH_SPEED := 80.0
+const HERO_KNOCKBACK_CHANCE := 0.3
+const HERO_KNOCKBACK_DISTANCE := 65.0
+# ระยะเวลาที่ Enemy ถูกดันถอยหลัง = ระยะเวลาที่ Enemy ถูก stun ด้วย
+const HERO_KNOCKBACK_DURATION := 0.12
+# ตำแหน่งสัมพัทธ์กับ leader ของ Hero ที่ไม่ได้ถูกเลือก เรียงตาม recruit_index น้อย→มาก: บน, ล่าง, ซ้าย
+const FORMATION_OFFSETS: Array[Vector2] = [Vector2(0, -150), Vector2(0, 150), Vector2(-150, 0)]
+const FORMATION_ARRIVE_DISTANCE := 5.0
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var sight_area: Area2D = $SightArea
@@ -28,6 +35,8 @@ var attack_interval: float = 1.0
 var attack_timer: float = 0.0
 var coin_count: int = 0
 var is_selected: bool = false
+# ลำดับการ recruit: ตัวแรกตั้งแต่ต้นเกม = 0, ตัวที่กด Recruit เพิ่มตามลำดับ = 1, 2, 3 (HeroParty เป็นคนตั้ง)
+var recruit_index: int = 0
 var state: HeroState = HeroState.SEEKING
 
 var enemies_in_sight: Array[Node2D] = []
@@ -79,8 +88,8 @@ func _process(delta: float) -> void:
 	if hp <= 0:
 		return
 
-	# is_selected มีผลกับ AI แค่จุดเดียว: ตัวที่ไม่ได้ถูกเลือกจะมี leash กลับหา leader
-	# ส่วน หา/ไล่/ต่อสู้/เดินขวา ด้านล่าง ทุกตัวรันอิสระของตัวเอง
+	# is_selected มีผลกับ AI แค่ตอนไม่มีการต่อสู้: ตัวที่ไม่ได้ถูกเลือกจะมี leash และ fallback กลับ formation slot
+	# ส่วน หา/ไล่/ต่อสู้ Enemy ด้านล่าง ทุกตัวรันอิสระของตัวเอง
 	if not is_selected:
 		_update_leash(delta)
 
@@ -94,8 +103,10 @@ func _process(delta: float) -> void:
 		var target := _find_nearest_enemy_in_sight()
 		if target:
 			_chase_enemy(target, delta)
-		else:
+		elif is_selected:
 			_walk_forward(delta)
+		else:
+			_move_to_formation_slot(delta)
 		return
 
 	state = HeroState.FIGHTING
@@ -105,9 +116,33 @@ func _process(delta: float) -> void:
 		_attack_current_target()
 
 
-# fallback เมื่อไม่มี Enemy ใน SightArea: เดินไปทางขวาเรื่อยๆ
+# fallback ของ Hero ที่ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินไปทางขวาเรื่อยๆ
 func _walk_forward(delta: float) -> void:
 	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position + Vector2.RIGHT * MOVE_SPEED * delta)
+
+
+# fallback ของ Hero ที่ไม่ได้ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินไป formation slot แล้วหยุดรอ
+func _move_to_formation_slot(delta: float) -> void:
+	var leader := get_tree().get_first_node_in_group("party_leader")
+	if leader == null:
+		return
+	var slot := _get_formation_slot(leader)
+	if global_position.distance_to(slot) < FORMATION_ARRIVE_DISTANCE:
+		return
+	# ใช้ RETURN_SPEED เพราะต้องเร็วกว่า leader ที่เดินขวาอยู่ ไม่งั้นจะตามไม่ทัน slot
+	global_position = global_position.move_toward(slot, RETURN_SPEED * delta)
+
+
+# คำนวณใหม่ทุกครั้งที่เรียก จึงอัปเดตเองเมื่อเปลี่ยนตัวที่เลือก / มีการ recruit / มี Hero ตาย
+func _get_formation_slot(leader: Node2D) -> Vector2:
+	var followers: Array[Node2D] = []
+	for hero in get_tree().get_nodes_in_group("heroes"):
+		if not hero.is_selected and hero.hp > 0:
+			followers.append(hero)
+	followers.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.recruit_index < b.recruit_index)
+
+	var slot_index := mini(followers.find(self), FORMATION_OFFSETS.size() - 1)
+	return WORLD_SCRIPT.clamp_to_bounds(leader.global_position + FORMATION_OFFSETS[slot_index])
 
 
 func _find_nearest_enemy_in_sight() -> Node2D:
@@ -149,6 +184,7 @@ func _update_leash(delta: float) -> void:
 	if leader == null:
 		return
 
+	# เข้า RETURNING ตามระยะห่างจาก leader เหมือนเดิม แต่เดินกลับไปที่ formation slot ของตัวเอง
 	var distance := global_position.distance_to(leader.global_position)
 
 	if distance > RETURN_LEASH_RANGE and state != HeroState.RETURNING:
@@ -160,9 +196,9 @@ func _update_leash(delta: float) -> void:
 	if state != HeroState.RETURNING:
 		return
 
-	if distance > RETURN_STOP_RANGE:
-		var next_position := global_position.move_toward(leader.global_position, RETURN_SPEED * delta)
-		global_position = WORLD_SCRIPT.clamp_to_bounds(next_position)
+	var slot := _get_formation_slot(leader)
+	if global_position.distance_to(slot) > RETURN_STOP_RANGE:
+		global_position = global_position.move_toward(slot, RETURN_SPEED * delta)
 	else:
 		state = HeroState.SEEKING
 		sight_area.monitoring = true
@@ -170,8 +206,14 @@ func _update_leash(delta: float) -> void:
 
 func _attack_current_target() -> void:
 	var target: Node2D = enemies_in_attack_range[0]
-	if is_instance_valid(target):
-		target.take_damage(attack_damage)
+	if not is_instance_valid(target):
+		return
+	target.take_damage(attack_damage)
+	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
+		var direction := global_position.direction_to(target.global_position)
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT
+		target.apply_knockback(direction * HERO_KNOCKBACK_DISTANCE, HERO_KNOCKBACK_DURATION)
 
 
 func take_damage(amount: int) -> void:
