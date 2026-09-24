@@ -3,6 +3,8 @@ extends CharacterBody2D
 const WALK_SPEED := 80.0
 const STOP_DISTANCE := 40.0
 const COIN_SCENE := preload("res://CoinPickup.tscn")
+const HP_POTION_SCENE := preload("res://HPPotionPickup.tscn")
+const HP_POTION_DROP_CHANCE := 0.5
 # อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ใช้เป็นรัศมีของ DetectArea
 const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
 
@@ -74,6 +76,9 @@ func take_damage(amount: int) -> void:
 	_flash_hit()
 	if hp <= 0:
 		_spawn_coin()
+		# สุ่มแยกจาก coin — ไม่ผูกกัน
+		if randf() < HP_POTION_DROP_CHANCE:
+			_spawn_hp_potion()
 		queue_free()
 
 
@@ -87,6 +92,12 @@ func _spawn_coin() -> void:
 	var coin := COIN_SCENE.instantiate()
 	get_parent().add_child(coin)
 	coin.global_position = global_position
+
+
+func _spawn_hp_potion() -> void:
+	var potion := HP_POTION_SCENE.instantiate()
+	get_parent().add_child(potion)
+	potion.global_position = global_position
 
 
 func _on_detect_area_body_entered(body: Node2D) -> void:
