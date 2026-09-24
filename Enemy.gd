@@ -3,47 +3,50 @@ extends CharacterBody2D
 const WALK_SPEED := 80.0
 const STOP_DISTANCE := 40.0
 const COIN_SCENE := preload("res://CoinPickup.tscn")
-# อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ยังไม่ได้ใช้ รอระบบ detect ของ Enemy (ส่วนที่ 4)
+# อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ใช้เป็นรัศมีของ DetectArea
 const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
 
 @onready var sprite: Sprite2D = $Sprite2D
+@onready var detect_area: Area2D = $DetectArea
 
 var hp: int = 30
 var attack_damage: int = 5
 var attack_interval: float = 1.5
 var attack_timer: float = 0.0
-var stopped := false
 var target_hero: Node2D = null
-# เริ่มต้นยืนนิ่งที่จุดเกิด จนกว่าจะถูก detect (ระบบ detect จะทำในส่วนถัดไป)
-var is_active := false
+
+var heroes_in_detect: Array[Node2D] = []
+
+
+func _ready() -> void:
+	var detect_shape: CircleShape2D = detect_area.get_node("CollisionShape2D").shape
+	detect_shape.radius = ENEMY_DETECT_RANGE
+	detect_area.body_entered.connect(_on_detect_area_body_entered)
+	detect_area.body_exited.connect(_on_detect_area_body_exited)
 
 
 func _process(delta: float) -> void:
-	if hp <= 0 or not is_active:
+	if hp <= 0:
 		return
 
-	_update_target()
+	# ไม่มี Hero ใน DetectArea (ยังไม่เคยเจอ หรือ Hero ออกนอกระยะไปแล้ว) = ยืนนิ่งที่ตำแหน่งปัจจุบัน
+	target_hero = _find_nearest_hero_in_detect()
 	if target_hero == null:
+		attack_timer = 0.0
 		return
 
-	if not stopped:
+	if global_position.distance_to(target_hero.global_position) > STOP_DISTANCE:
+		attack_timer = 0.0
 		_walk_toward_target(delta)
 	else:
 		_attack_target(delta)
 
 
-func _update_target() -> void:
-	if is_instance_valid(target_hero) and target_hero.hp > 0:
-		return
-	target_hero = _find_nearest_hero()
-	stopped = false
-
-
-func _find_nearest_hero() -> Node2D:
+func _find_nearest_hero_in_detect() -> Node2D:
 	var closest: Node2D = null
 	var closest_dist := INF
-	for hero in get_tree().get_nodes_in_group("heroes"):
-		if hero.hp <= 0:
+	for hero in heroes_in_detect:
+		if not is_instance_valid(hero) or hero.hp <= 0:
 			continue
 		var dist: float = global_position.distance_to(hero.global_position)
 		if dist < closest_dist:
@@ -52,11 +55,8 @@ func _find_nearest_hero() -> Node2D:
 	return closest
 
 
+# เดินตรงเข้าหา Hero ตามเวกเตอร์ทิศทางจริง (ทั้งแกน X และ Y) จนกว่าจะเข้าระยะโจมตี
 func _walk_toward_target(delta: float) -> void:
-	var distance := global_position.distance_to(target_hero.global_position)
-	if distance <= STOP_DISTANCE:
-		stopped = true
-		return
 	global_position = global_position.move_toward(target_hero.global_position, WALK_SPEED * delta)
 
 
@@ -87,3 +87,11 @@ func _spawn_coin() -> void:
 	var coin := COIN_SCENE.instantiate()
 	get_parent().add_child(coin)
 	coin.global_position = global_position
+
+
+func _on_detect_area_body_entered(body: Node2D) -> void:
+	heroes_in_detect.append(body)
+
+
+func _on_detect_area_body_exited(body: Node2D) -> void:
+	heroes_in_detect.erase(body)

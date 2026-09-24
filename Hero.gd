@@ -8,7 +8,6 @@ const MOVE_SPEED := 150.0
 # รัศมีของ SightArea (เดิม 200 ใน Hero.tscn) — ขยาย 2 เท่าเพราะ World แนวตั้งแคบลง
 const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
-const CHASE_SPEED := 100.0
 const HERO_SEPARATION_DISTANCE := 24.0
 const SEPARATION_PUSH_SPEED := 80.0
 
@@ -84,10 +83,12 @@ func _process(delta: float) -> void:
 	if enemies_in_attack_range.is_empty():
 		state = HeroState.SEEKING
 		attack_timer = 0.0
-		if enemies_in_sight.is_empty():
-			_walk_forward(delta)
+		# หาเป้าใหม่ทุกเฟรม — ถ้าเป้าเดิมตาย/หายไป จะได้ตัวใกล้สุดตัวถัดไปทันที
+		var target := _find_nearest_enemy_in_sight()
+		if target:
+			_chase_enemy(target, delta)
 		else:
-			_chase_sighted_enemy(delta)
+			_walk_forward(delta)
 		return
 
 	state = HeroState.FIGHTING
@@ -97,19 +98,28 @@ func _process(delta: float) -> void:
 		_attack_current_target()
 
 
-# เดินไปทางขวาเรื่อยๆ ด้วย position ของ Hero เอง (แทนการเลื่อน World แบบเดิม)
-# TODO: รอบถัดไปจะเปลี่ยนเป็น AI ไล่ล่าแบบ 2 แกน
+# fallback เมื่อไม่มี Enemy ใน SightArea: เดินไปทางขวาเรื่อยๆ
 func _walk_forward(delta: float) -> void:
 	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position + Vector2.RIGHT * MOVE_SPEED * delta)
 
 
-func _chase_sighted_enemy(delta: float) -> void:
-	if enemies_in_sight.is_empty():
-		return
-	var target: Node2D = enemies_in_sight[0]
-	if not is_instance_valid(target):
-		return
-	position = position.move_toward(target.global_position, CHASE_SPEED * delta)
+func _find_nearest_enemy_in_sight() -> Node2D:
+	var nearest: Node2D = null
+	var nearest_dist := INF
+	for enemy in enemies_in_sight:
+		if not is_instance_valid(enemy) or enemy.hp <= 0:
+			continue
+		var dist := global_position.distance_to(enemy.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = enemy
+	return nearest
+
+
+# เดินตรงเข้าหา Enemy ตามเวกเตอร์ทิศทางจริง (ทั้งแกน X และ Y) จนกว่าจะเข้า AttackArea
+func _chase_enemy(target: Node2D, delta: float) -> void:
+	var next_position := global_position.move_toward(target.global_position, MOVE_SPEED * delta)
+	global_position = WORLD_SCRIPT.clamp_to_bounds(next_position)
 
 
 func _physics_process(_delta: float) -> void:
