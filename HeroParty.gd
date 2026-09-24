@@ -5,8 +5,8 @@ const HERO_COUNT := 2
 const MAX_HEROES := 4
 const LANE_GAP := 40.0
 const RECRUIT_OFFSET := 30.0
-# จุดเกิดในพิกัด World (ขนาด 14400x2560): ชิดซ้าย กึ่งกลางแนวตั้ง
-const BASE_POSITION := Vector2(1000, 1280)
+# จุดเกิดในพิกัด World (ขนาด 14400x1280): ชิดซ้าย กึ่งกลางแนวตั้ง
+const BASE_POSITION := Vector2(1000, 640)
 
 
 func _ready() -> void:

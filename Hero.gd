@@ -4,7 +4,12 @@ enum HeroState { SEEKING, FIGHTING, RETURNING }
 
 const SELECT_HALF_SIZE := Vector2(120, 160)
 const RETURN_LEASH_RANGE := 300.0
+# เมื่อเข้า RETURNING แล้ว ให้เดินกลับจนเข้าใกล้ leader ระยะนี้ก่อนค่อยกลับไปหา Enemy
+# (ถ้าหยุดที่ขอบ 300 พอดี จะสลับ RETURNING/SEEKING ไปมาทุกเฟรม)
+const RETURN_STOP_RANGE := 150.0
 const MOVE_SPEED := 150.0
+# ต้องเร็วกว่า MOVE_SPEED ไม่งั้นจะไม่มีวันตามทัน leader ที่กำลังเดินขวาอยู่
+const RETURN_SPEED := 225.0
 # รัศมีของ SightArea (เดิม 200 ใน Hero.tscn) — ขยาย 2 เท่าเพราะ World แนวตั้งแคบลง
 const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
@@ -74,6 +79,8 @@ func _process(delta: float) -> void:
 	if hp <= 0:
 		return
 
+	# is_selected มีผลกับ AI แค่จุดเดียว: ตัวที่ไม่ได้ถูกเลือกจะมี leash กลับหา leader
+	# ส่วน หา/ไล่/ต่อสู้/เดินขวา ด้านล่าง ทุกตัวรันอิสระของตัวเอง
 	if not is_selected:
 		_update_leash(delta)
 
@@ -144,14 +151,19 @@ func _update_leash(delta: float) -> void:
 
 	var distance := global_position.distance_to(leader.global_position)
 
-	if distance > RETURN_LEASH_RANGE:
-		if state != HeroState.RETURNING:
-			state = HeroState.RETURNING
-			attack_timer = 0.0
-			enemies_in_sight.clear()
-			sight_area.monitoring = false
-		position = position.move_toward(leader.global_position, MOVE_SPEED * delta)
-	elif state == HeroState.RETURNING:
+	if distance > RETURN_LEASH_RANGE and state != HeroState.RETURNING:
+		state = HeroState.RETURNING
+		attack_timer = 0.0
+		enemies_in_sight.clear()
+		sight_area.monitoring = false
+
+	if state != HeroState.RETURNING:
+		return
+
+	if distance > RETURN_STOP_RANGE:
+		var next_position := global_position.move_toward(leader.global_position, RETURN_SPEED * delta)
+		global_position = WORLD_SCRIPT.clamp_to_bounds(next_position)
+	else:
 		state = HeroState.SEEKING
 		sight_area.monitoring = true
 
