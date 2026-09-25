@@ -13,7 +13,7 @@ const RETURN_SPEED := 225.0
 # รัศมีของ SightArea (เดิม 200 ใน Hero.tscn) — ขยาย 2 เท่าเพราะ World แนวตั้งแคบลง
 const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
-# Hero ไม่ได้ชนกันด้วย collision (layer "heroes" ไม่อยู่ใน mask ของตัวเอง ตัว 240x320 จะดันกันจนเข้า formation ไม่ได้)
+# Hero ไม่ได้ชนกันด้วย collision (layer "heroes" ไม่อยู่ใน mask ของตัวเอง ตัว 76x148 จะดันกันจนเข้า formation ไม่ได้)
 # จึงใช้แรงผลักแบบนุ่มแทน: ใกล้กันกว่า HERO_SEPARATION_DISTANCE จะถูกดันออกทั้งแกน X/Y แรงขึ้นตามระยะที่ซ้อนกัน
 const HERO_SEPARATION_DISTANCE := 90.0
 const SEPARATION_PUSH_SPEED := 400.0
@@ -24,6 +24,11 @@ const HERO_KNOCKBACK_DURATION := 0.12
 # ตำแหน่งสัมพัทธ์กับ leader ของ Hero ที่ไม่ได้ถูกเลือก เรียงตาม recruit_index น้อย→มาก: บน, ล่าง, ซ้าย
 const FORMATION_OFFSETS: Array[Vector2] = [Vector2(0, -150), Vector2(0, 150), Vector2(-150, 0)]
 const FORMATION_ARRIVE_DISTANCE := 5.0
+# offset ของ AnimatedSprite2D ตอนหันขวา (ตัว knight อยู่เยื้องซ้ายใน frame 120x80) — ตอน flip_h ต้องกลับด้าน x เอง
+# เพราะ flip_h ไม่ได้ flip offset ให้ ลำตัวจะเลื่อนออกจาก origin
+const SPRITE_OFFSET := Vector2(6, -21)
+# ความเร็วต่ำกว่านี้ถือว่ายืนนิ่ง (เล่น idle) — กันแรงผลัก separation เล็กๆ ทำให้สลับ run/idle
+const ANIM_MOVE_THRESHOLD := 5.0
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var sight_area: Area2D = $SightArea
@@ -51,7 +56,7 @@ var enemies_in_attack_range: Array[Node2D] = []
 
 func _ready() -> void:
 	add_to_group("heroes")
-	animated_sprite.play("walk")
+	animated_sprite.play("idle")
 	var sight_shape: CircleShape2D = sight_area.get_node("CollisionShape2D").shape
 	sight_shape.radius = HERO_DETECT_RANGE
 	sight_area.body_entered.connect(_on_sight_area_body_entered)
@@ -99,6 +104,7 @@ func _physics_process(delta: float) -> void:
 	velocity = move_velocity + _get_separation_velocity()
 	move_and_slide()
 	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position)
+	_update_animation()
 
 
 func _update_ai(delta: float) -> void:
@@ -233,6 +239,7 @@ func _attack_current_target() -> void:
 	var target: Node2D = enemies_in_attack_range[0]
 	if not is_instance_valid(target):
 		return
+	animated_sprite.play("attack")
 	target.take_damage(attack_damage)
 	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
 		var direction := global_position.direction_to(target.global_position)
@@ -247,7 +254,53 @@ func take_damage(amount: int) -> void:
 	hp -= amount
 	_flash_hit()
 	if hp <= 0:
-		print("Hero died")
+		_die()
+	elif not _is_playing_action("attack"):
+		animated_sprite.play("hit")
+
+
+# _physics_process หยุด AI/การเดินเองเมื่อ hp <= 0 — ตรงนี้ปิด collision/area แล้วรอ death เล่นจบ
+func _die() -> void:
+	velocity = Vector2.ZERO
+	$CollisionShape2D.set_deferred("disabled", true)
+	sight_area.set_deferred("monitoring", false)
+	attack_area.set_deferred("monitoring", false)
+	animated_sprite.play("death")
+	await animated_sprite.animation_finished
+	print("Hero died")
+
+
+# attack / hit เล่นจนจบก่อน แล้วค่อยกลับเป็น idle/run ตามความเร็ว
+func _update_animation() -> void:
+	if absf(velocity.x) > ANIM_MOVE_THRESHOLD:
+		_set_facing_left(velocity.x < 0)
+	else:
+		var target := _get_facing_target()
+		if target:
+			_set_facing_left(target.global_position.x < global_position.x)
+
+	if _is_playing_action("attack") or _is_playing_action("hit"):
+		return
+	if velocity.length() > ANIM_MOVE_THRESHOLD:
+		animated_sprite.play("run")
+	else:
+		animated_sprite.play("idle")
+
+
+func _is_playing_action(anim_name: StringName) -> bool:
+	return animated_sprite.animation == anim_name and animated_sprite.is_playing()
+
+
+func _get_facing_target() -> Node2D:
+	for enemy in enemies_in_attack_range:
+		if is_instance_valid(enemy) and enemy.hp > 0:
+			return enemy
+	return _find_nearest_enemy_in_sight()
+
+
+func _set_facing_left(left: bool) -> void:
+	animated_sprite.flip_h = left
+	animated_sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
 
 
 func add_coin(amount: int) -> void:

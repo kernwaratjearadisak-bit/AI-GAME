@@ -1,15 +1,20 @@
 extends CharacterBody2D
 
 const WALK_SPEED := 80.0
-const STOP_DISTANCE := 40.0
+# ระยะ center-to-center ที่หยุดเดินแล้วเริ่มตี: ลำตัว knight กว้าง 76 → ≥ 76 ไม่ทับกัน
+# ≥ จุดที่ Hero หยุด (AttackArea 80 + ครึ่งความกว้าง Enemy 38 = 118) จึงตีกันได้ทั้งคู่ที่ระยะ ~118
+const STOP_DISTANCE := 120.0
 const COIN_SCENE := preload("res://CoinPickup.tscn")
 const HP_POTION_SCENE := preload("res://HPPotionPickup.tscn")
 const HP_POTION_DROP_CHANCE := 0.25
 const WORLD_SCRIPT := preload("res://World.gd")
 # อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ใช้เป็นรัศมีของ DetectArea
 const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
+# ใช้ offset / threshold ชุดเดียวกับ Hero
+const SPRITE_OFFSET: Vector2 = preload("res://Hero.gd").SPRITE_OFFSET
+const ANIM_MOVE_THRESHOLD: float = preload("res://Hero.gd").ANIM_MOVE_THRESHOLD
 
-@onready var sprite: Sprite2D = $Sprite2D
+@onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var detect_area: Area2D = $DetectArea
 
 var hp: int = 30
@@ -31,6 +36,15 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if hp <= 0:
+		return
+	# Enemy เดินด้วยการตั้ง global_position ตรงๆ ไม่มี velocity — วัดระยะที่ขยับในเฟรมนี้แทน
+	var previous_position := global_position
+	_update_ai(delta)
+	_update_animation((global_position - previous_position) / delta)
+
+
+func _update_ai(delta: float) -> void:
 	# ระหว่างโดน knock-back = stun: ไม่เดิน ไม่โจมตี
 	if hp <= 0 or is_knocked_back:
 		return
@@ -70,6 +84,7 @@ func _attack_target(delta: float) -> void:
 	attack_timer += delta
 	if attack_timer >= attack_interval:
 		attack_timer = 0.0
+		sprite.play("attack")
 		target_hero.take_damage(attack_damage)
 
 
@@ -94,7 +109,42 @@ func take_damage(amount: int) -> void:
 		# สุ่มแยกจาก coin — ไม่ผูกกัน
 		if randf() < HP_POTION_DROP_CHANCE:
 			_spawn_hp_potion()
-		queue_free()
+		_die()
+	elif not _is_playing_action("attack"):
+		sprite.play("hit")
+
+
+# ของ drop ออกไปแล้วตอน hp ถึง 0 — ตรงนี้ปิด collision/area แล้วรอ death เล่นจบก่อน queue_free
+func _die() -> void:
+	$CollisionShape2D.set_deferred("disabled", true)
+	detect_area.set_deferred("monitoring", false)
+	sprite.play("death")
+	await sprite.animation_finished
+	queue_free()
+
+
+# attack / hit เล่นจนจบก่อน แล้วค่อยกลับเป็น idle/run ตามการเคลื่อนที่
+func _update_animation(motion: Vector2) -> void:
+	if absf(motion.x) > ANIM_MOVE_THRESHOLD:
+		_set_facing_left(motion.x < 0)
+	elif is_instance_valid(target_hero):
+		_set_facing_left(target_hero.global_position.x < global_position.x)
+
+	if _is_playing_action("attack") or _is_playing_action("hit"):
+		return
+	if motion.length() > ANIM_MOVE_THRESHOLD:
+		sprite.play("run")
+	else:
+		sprite.play("idle")
+
+
+func _is_playing_action(anim_name: StringName) -> bool:
+	return sprite.animation == anim_name and sprite.is_playing()
+
+
+func _set_facing_left(left: bool) -> void:
+	sprite.flip_h = left
+	sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
 
 
 func _flash_hit() -> void:
