@@ -37,7 +37,7 @@ const ANIM_MOVE_THRESHOLD := 5.0
 # hysteresis ของ run/idle: เร็วกว่า RUN เปลี่ยนเป็น run, ช้ากว่า IDLE กลับเป็น idle กันสลับรัวๆ
 const ANIM_RUN_SPEED := 20.0
 const ANIM_IDLE_SPEED := 8.0
-# ราคาอัป STR / VIT / AGI +1 (ใช้ coin ของ Hero ตัวนั้นเอง)
+# ราคาอัป STR / VIT / AGI +1 (หักจาก coin กองกลางใน HeroParty)
 const STAT_UPGRADE_COST := 5
 
 # ประเภทการเดินในเฟรมนี้ — ใช้ตัดสินว่าจะใส่ separation ไหม และจะหันหน้าตามอะไร
@@ -65,7 +65,6 @@ var attack_damage: float = 10.0
 		_update_attack_interval()
 var attack_interval: float = 1.0
 var attack_timer: float = 0.0
-var coin_count: int = 0
 var is_selected: bool = false
 # ลำดับการ recruit: ตัวแรกตั้งแต่ต้นเกม = 0, ตัวที่กด Recruit เพิ่มตามลำดับ = 1, 2, 3 (HeroParty เป็นคนตั้ง)
 var recruit_index: int = 0
@@ -307,9 +306,13 @@ func take_damage(amount: float) -> void:
 		animated_sprite.play("hit")
 
 
-# เรียกจากปุ่ม + ใน HeroStatusPanel — coin ไม่พอหรือชื่อ stat ไม่ถูกต้อง = ไม่เปลี่ยนอะไรเลย
+# เรียกจากปุ่ม + ใน HeroStatusPanel — อัป stat ของ Hero ตัวนี้ ด้วย coin กองกลาง
+# coin ไม่พอหรือชื่อ stat ไม่ถูกต้อง = ไม่เปลี่ยนอะไรเลย
 func try_upgrade_stat(stat_name: StringName) -> bool:
-	if coin_count < STAT_UPGRADE_COST:
+	if stat_name not in [&"strength", &"vitality", &"agility"]:
+		return false
+	var hero_party := get_tree().get_first_node_in_group("hero_party")
+	if hero_party == null or not hero_party.spend_coins(STAT_UPGRADE_COST):
 		return false
 	match stat_name:
 		&"strength":
@@ -319,9 +322,6 @@ func try_upgrade_stat(stat_name: StringName) -> bool:
 		&"agility":
 			# setter ของ agility คำนวณ attack_interval ใหม่จาก base_attack_interval ให้ทันที
 			agility += 1
-		_:
-			return false
-	coin_count -= STAT_UPGRADE_COST
 	return true
 
 
@@ -329,7 +329,7 @@ func _update_attack_interval() -> void:
 	attack_interval = CombatStats.get_attack_interval(base_attack_interval, agility)
 
 
-# เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index / coin_count ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
+# เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
 func reset_for_new_stage() -> void:
 	var was_dead := hp <= 0
 	hp = max_hp
@@ -401,10 +401,6 @@ func _get_facing_target() -> Node2D:
 func _set_facing_left(left: bool) -> void:
 	animated_sprite.flip_h = left
 	animated_sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
-
-
-func add_coin(amount: int) -> void:
-	coin_count += amount
 
 
 func _spawn_damage_number(amount: float) -> void:

@@ -1,5 +1,8 @@
 extends Node2D
 
+# coin กองกลางของทั้ง party เปลี่ยน — ResourceBar / UI ฟังได้
+signal coins_changed(new_amount: int)
+
 const HERO_SCENE := preload("res://Hero.tscn")
 const HERO_COUNT := 2
 const MAX_HEROES := 4
@@ -10,6 +13,9 @@ const BASE_POSITION := Vector2(1000, 640)
 
 # ตัวแรกตั้งแต่ต้นเกม = 0 ตัวที่ recruit เพิ่มได้ 1, 2, 3 ตามลำดับ
 var next_recruit_index := 0
+# coin กองกลาง — อ่าน/แก้ผ่าน add_coins / can_afford / spend_coins เท่านั้น
+# HeroParty ไม่ถูกสร้างใหม่ตอน reset_stage จึงคงอยู่ข้าม stage
+var party_coins: int = 0
 
 
 func _ready() -> void:
@@ -49,6 +55,24 @@ func recruit_hero() -> void:
 	next_recruit_index += 1
 	add_child(hero)
 	hero.global_position = spawn_position + Vector2(0, RECRUIT_OFFSET)
+
+
+func add_coins(amount: int) -> void:
+	party_coins += amount
+	coins_changed.emit(party_coins)
+
+
+func can_afford(amount: int) -> bool:
+	return party_coins >= amount
+
+
+# ไม่พอ = ไม่หักและคืน false
+func spend_coins(amount: int) -> bool:
+	if not can_afford(amount):
+		return false
+	party_coins -= amount
+	coins_changed.emit(party_coins)
+	return true
 
 
 # เรียกจาก Main.reset_stage(): ไม่สร้าง Hero ใหม่ — reset ตัวเดิม แล้ววาง leader ที่ BASE_POSITION, follower ที่ formation slot

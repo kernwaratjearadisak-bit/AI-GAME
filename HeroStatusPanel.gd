@@ -36,8 +36,9 @@ func _process(_delta: float) -> void:
 		vit_label.text = "VIT: %d" % leader.vitality
 		agi_label.text = "AGI: %d" % leader.agility
 
-	# ไม่มี leader หรือ coin ไม่พอ = กดไม่ได้
-	var can_upgrade: bool = leader != null and leader.coin_count >= STAT_UPGRADE_COST
+	# ไม่มี leader หรือ coin กองกลางไม่พอ = กดไม่ได้
+	var hero_party := get_tree().get_first_node_in_group("hero_party")
+	var can_upgrade: bool = leader != null and hero_party != null and hero_party.can_afford(STAT_UPGRADE_COST)
 	str_plus_button.disabled = not can_upgrade
 	vit_plus_button.disabled = not can_upgrade
 	agi_plus_button.disabled = not can_upgrade
@@ -56,7 +57,7 @@ func _on_recruit_pressed() -> void:
 	if hero_party:
 		hero_party.recruit_hero()
 
-# อัป stat ของ Hero ที่ถูกเลือก ด้วย coin ของตัวนั้น — logic อยู่ใน Hero.try_upgrade_stat()
+# อัป stat ของ Hero ที่ถูกเลือก ด้วย coin กองกลาง — logic อยู่ใน Hero.try_upgrade_stat()
 func _on_stat_plus_pressed(stat_name: StringName) -> void:
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	if leader:
