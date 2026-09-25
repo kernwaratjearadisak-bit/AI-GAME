@@ -10,10 +10,17 @@ const VIT_REDUCTION_CONSTANT := 100.0
 # AGI: ความเร็วโจมตีเพิ่ม 3% ต่อแต้ม แต่ interval ไม่ต่ำกว่า MIN_ATTACK_INTERVAL
 const AGI_SPEED_PER_POINT := 0.03
 const MIN_ATTACK_INTERVAL := 0.25
+# damage ที่ส่งออกสุ่ม ±20% ทุกครั้งที่ตี
+const DAMAGE_VARIANCE := 0.2
 
 
 static func get_damage_output(attack_damage: float, strength: float) -> float:
 	return snappedf(attack_damage * (1.0 + strength * STR_DAMAGE_PER_POINT), 0.01)
+
+
+# เรียกหลัง get_damage_output ทุกครั้งที่ตี (สุ่มใหม่ทุกครั้ง) — UI แสดงค่ากลางจาก get_damage_output ตรงๆ
+static func roll_damage(base_output: float) -> float:
+	return snappedf(base_output * randf_range(1.0 - DAMAGE_VARIANCE, 1.0 + DAMAGE_VARIANCE), 0.01)
 
 
 static func get_damage_reduction(vitality: float) -> float:

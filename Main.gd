@@ -37,6 +37,7 @@ var stage_title_tween: Tween = null
 
 @onready var enemy_container: Node2D = $Enemies
 @onready var camera: Camera2D = $Camera2D
+@onready var effects: Node2D = $Effects
 @onready var stage_title_label: Label = $UI/StageTitleLabel
 
 
@@ -103,6 +104,9 @@ func reset_stage() -> void:
 	for child in enemy_container.get_children():
 		child.queue_free()
 	boss = null
+	# ตัวเลข damage ที่ยังลอยค้างอยู่
+	for child in effects.get_children():
+		child.queue_free()
 
 	# ย้าย Hero กลับจุดเริ่มก่อน เพราะการสุ่ม spawn point ใช้ตำแหน่ง leader กัน HERO_SAFE_RADIUS
 	var party := get_tree().get_first_node_in_group("hero_party")

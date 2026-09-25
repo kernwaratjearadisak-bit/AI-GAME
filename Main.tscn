@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cf7lvh2v7xwfq"]
+[gd_scene load_steps=9 format=3 uid="uid://cf7lvh2v7xwfq"]
 
 [ext_resource type="Script" path="res://World.gd" id="2"]
 [ext_resource type="Script" path="res://Background.gd" id="3"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://HeroStatusPanel.gd" id="6"]
 [ext_resource type="Script" path="res://HeroParty.gd" id="7"]
 [ext_resource type="Script" path="res://CameraFollow.gd" id="8"]
+[ext_resource type="Script" path="res://Effects.gd" id="9"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("4")
@@ -21,6 +22,9 @@ script = ExtResource("3")
 
 [node name="HeroParty" type="Node2D" parent="."]
 script = ExtResource("7")
+
+[node name="Effects" type="Node2D" parent="."]
+script = ExtResource("9")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 script = ExtResource("8")
@@ -104,32 +108,57 @@ size = Vector2(200, 60)
 text = "Recruit"
 
 [node name="STRLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 20)
-size = Vector2(320, 40)
+position = Vector2(380, 10)
+size = Vector2(220, 64)
+vertical_alignment = 1
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "STR: 10"
 
 [node name="VITLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 65)
-size = Vector2(320, 40)
+position = Vector2(380, 84)
+size = Vector2(220, 64)
+vertical_alignment = 1
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "VIT: 10"
 
 [node name="AGILabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 110)
-size = Vector2(320, 40)
+position = Vector2(380, 158)
+size = Vector2(220, 64)
+vertical_alignment = 1
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "AGI: 10"
 
 [node name="DEFLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 155)
-size = Vector2(320, 40)
+position = Vector2(380, 232)
+size = Vector2(220, 64)
+vertical_alignment = 1
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "DEF: 9.09%"
+
+[node name="STRPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+focus_mode = 0
+position = Vector2(620, 10)
+size = Vector2(64, 64)
+theme_override_font_sizes/font_size = 36
+text = "+"
+
+[node name="VITPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+focus_mode = 0
+position = Vector2(620, 84)
+size = Vector2(64, 64)
+theme_override_font_sizes/font_size = 36
+text = "+"
+
+[node name="AGIPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+focus_mode = 0
+position = Vector2(620, 158)
+size = Vector2(64, 64)
+theme_override_font_sizes/font_size = 36
+text = "+"
 
 [node name="StageTitleLabel" type="Label" parent="UI"]
 visible = false

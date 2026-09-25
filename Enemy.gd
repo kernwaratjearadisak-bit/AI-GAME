@@ -8,6 +8,8 @@ const COIN_SCENE := preload("res://CoinPickup.tscn")
 const HP_POTION_SCENE := preload("res://HPPotionPickup.tscn")
 const HP_POTION_DROP_CHANCE := 0.25
 const WORLD_SCRIPT := preload("res://World.gd")
+# สีตัวเลข damage ตอน Enemy/Boss โดน Hero ตี
+const DAMAGE_NUMBER_COLOR := Color(0.3, 0.6, 1.0)
 # อ้างอิงค่าเดียวกับ Hero เพื่อให้ปรับพร้อมกัน — ใช้เป็นรัศมีของ DetectArea
 const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
 # ใช้ offset / threshold ชุดเดียวกับ Hero
@@ -116,7 +118,8 @@ func _attack_target(delta: float) -> void:
 	if attack_timer >= attack_interval:
 		attack_timer = 0.0
 		sprite.play("attack", CombatStats.get_attack_anim_speed(sprite, attack_interval))
-		target_hero.take_damage(CombatStats.get_damage_output(attack_damage, strength))
+		# STR → สุ่ม ±20% → (ฝั่งที่โดนตี) หัก VIT ใน take_damage
+		target_hero.take_damage(CombatStats.roll_damage(CombatStats.get_damage_output(attack_damage, strength)))
 
 
 func _update_attack_interval() -> void:
@@ -137,7 +140,9 @@ func apply_knockback(offset: Vector2, duration: float) -> void:
 func take_damage(amount: float) -> void:
 	if hp <= 0:
 		return
-	hp = snappedf(hp - CombatStats.get_damage_received(amount, vitality), 0.01)
+	var received := CombatStats.get_damage_received(amount, vitality)
+	hp = snappedf(hp - received, 0.01)
+	_spawn_damage_number(received)
 	_flash_hit()
 	if hp <= 0:
 		_spawn_coin()
@@ -180,6 +185,12 @@ func _is_playing_action(anim_name: StringName) -> bool:
 func _set_facing_left(left: bool) -> void:
 	sprite.flip_h = left
 	sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
+
+
+func _spawn_damage_number(amount: float) -> void:
+	var effects := get_tree().get_first_node_in_group("effects")
+	if effects:
+		effects.spawn_damage_number(self, amount, DAMAGE_NUMBER_COLOR)
 
 
 func _flash_hit() -> void:

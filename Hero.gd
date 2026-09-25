@@ -13,6 +13,8 @@ const RETURN_SPEED := 225.0
 # รัศมีของ SightArea (เดิม 200 ใน Hero.tscn) — ขยาย 2 เท่าเพราะ World แนวตั้งแคบลง
 const HERO_DETECT_RANGE := 400.0
 const WORLD_SCRIPT := preload("res://World.gd")
+# สีตัวเลข damage ตอน Hero โดนตี
+const DAMAGE_NUMBER_COLOR := Color(1.0, 0.25, 0.25)
 # Hero ไม่ได้ชนกันด้วย collision (layer "heroes" ไม่อยู่ใน mask ของตัวเอง ตัว 76x148 จะดันกันจนเข้า formation ไม่ได้)
 # จึงใช้แรงผลักแบบนุ่มแทน: ใกล้กันกว่า HERO_SEPARATION_DISTANCE จะถูกดันออกทั้งแกน X/Y แรงขึ้นตามระยะที่ซ้อนกัน
 const HERO_SEPARATION_DISTANCE := 90.0
@@ -35,6 +37,8 @@ const ANIM_MOVE_THRESHOLD := 5.0
 # hysteresis ของ run/idle: เร็วกว่า RUN เปลี่ยนเป็น run, ช้ากว่า IDLE กลับเป็น idle กันสลับรัวๆ
 const ANIM_RUN_SPEED := 20.0
 const ANIM_IDLE_SPEED := 8.0
+# ราคาอัป STR / VIT / AGI +1 (ใช้ coin ของ Hero ตัวนั้นเอง)
+const STAT_UPGRADE_COST := 5
 
 # ประเภทการเดินในเฟรมนี้ — ใช้ตัดสินว่าจะใส่ separation ไหม และจะหันหน้าตามอะไร
 enum MoveMode { NONE, CHASE, FORMATION, RETURN }
@@ -281,7 +285,8 @@ func _attack_current_target() -> void:
 	if not is_instance_valid(target):
 		return
 	animated_sprite.play("attack", CombatStats.get_attack_anim_speed(animated_sprite, attack_interval))
-	target.take_damage(CombatStats.get_damage_output(attack_damage, strength))
+	# STR → สุ่ม ±20% → (ฝั่งที่โดนตี) หัก VIT ใน take_damage
+	target.take_damage(CombatStats.roll_damage(CombatStats.get_damage_output(attack_damage, strength)))
 	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
 		var direction := global_position.direction_to(target.global_position)
 		if direction == Vector2.ZERO:
@@ -292,12 +297,32 @@ func _attack_current_target() -> void:
 func take_damage(amount: float) -> void:
 	if hp <= 0:
 		return
-	hp = snappedf(hp - CombatStats.get_damage_received(amount, vitality), 0.01)
+	var received := CombatStats.get_damage_received(amount, vitality)
+	hp = snappedf(hp - received, 0.01)
+	_spawn_damage_number(received)
 	_flash_hit()
 	if hp <= 0:
 		_die()
 	elif not _is_playing_action("attack"):
 		animated_sprite.play("hit")
+
+
+# เรียกจากปุ่ม + ใน HeroStatusPanel — coin ไม่พอหรือชื่อ stat ไม่ถูกต้อง = ไม่เปลี่ยนอะไรเลย
+func try_upgrade_stat(stat_name: StringName) -> bool:
+	if coin_count < STAT_UPGRADE_COST:
+		return false
+	match stat_name:
+		&"strength":
+			strength += 1
+		&"vitality":
+			vitality += 1
+		&"agility":
+			# setter ของ agility คำนวณ attack_interval ใหม่จาก base_attack_interval ให้ทันที
+			agility += 1
+		_:
+			return false
+	coin_count -= STAT_UPGRADE_COST
+	return true
 
 
 func _update_attack_interval() -> void:
@@ -380,6 +405,12 @@ func _set_facing_left(left: bool) -> void:
 
 func add_coin(amount: int) -> void:
 	coin_count += amount
+
+
+func _spawn_damage_number(amount: float) -> void:
+	var effects := get_tree().get_first_node_in_group("effects")
+	if effects:
+		effects.spawn_damage_number(self, amount, DAMAGE_NUMBER_COLOR)
 
 
 func _flash_hit() -> void:
