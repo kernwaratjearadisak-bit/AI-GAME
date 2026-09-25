@@ -18,6 +18,8 @@ const ANIM_MOVE_THRESHOLD: float = preload("res://Hero.gd").ANIM_MOVE_THRESHOLD
 @onready var detect_area: Area2D = $DetectArea
 
 var hp: int = 30
+# Boss ตั้งค่าใหม่ใน _ready (const override ใน subclass ไม่ได้) — Enemy ปกติใช้ STOP_DISTANCE เหมือนเดิม
+var stop_distance: float = STOP_DISTANCE
 var attack_damage: int = 5
 var attack_interval: float = 1.5
 var attack_timer: float = 0.0
@@ -55,7 +57,7 @@ func _update_ai(delta: float) -> void:
 		attack_timer = 0.0
 		return
 
-	if global_position.distance_to(target_hero.global_position) > STOP_DISTANCE:
+	if global_position.distance_to(target_hero.global_position) > stop_distance:
 		attack_timer = 0.0
 		_walk_toward_target(delta)
 	else:

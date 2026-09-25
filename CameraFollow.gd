@@ -24,6 +24,15 @@ func _ready() -> void:
 	make_current()
 
 
+# ใช้ตอน leader ถูกย้ายข้าม World (เช่น reset stage) — กระโดดไปทันที ไม่ให้ smoothing เลื่อนผ่านทั้ง World
+func snap_to_leader() -> void:
+	var leader := get_tree().get_first_node_in_group("party_leader")
+	if leader == null:
+		return
+	global_position = leader.global_position
+	reset_smoothing()
+
+
 func _process(_delta: float) -> void:
 	# Hero ที่ is_selected = true จะอยู่ใน group "party_leader" เสมอ (ดู Hero.select())
 	var leader := get_tree().get_first_node_in_group("party_leader")

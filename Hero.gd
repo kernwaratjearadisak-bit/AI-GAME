@@ -23,12 +23,21 @@ const HERO_KNOCKBACK_DISTANCE := 65.0
 const HERO_KNOCKBACK_DURATION := 0.12
 # ตำแหน่งสัมพัทธ์กับ leader ของ Hero ที่ไม่ได้ถูกเลือก เรียงตาม recruit_index น้อย→มาก: บน, ล่าง, ซ้าย
 const FORMATION_OFFSETS: Array[Vector2] = [Vector2(0, -150), Vector2(0, 150), Vector2(-150, 0)]
-const FORMATION_ARRIVE_DISTANCE := 5.0
+# ตาม formation แบบ feed-forward: desired = ความเร็ว leader + (slot - ตำแหน่ง) * GAIN (ไม่มี dead zone หยุด/วิ่ง)
+# แล้วค่อยๆ ปรับความเร็วเข้าหา desired ด้วย FORMATION_ACCEL (px/s²) ไม่ให้กระตุก
+const FORMATION_CORRECTION_GAIN := 4.0
+const FORMATION_ACCEL := 1200.0
 # offset ของ AnimatedSprite2D ตอนหันขวา (ตัว knight อยู่เยื้องซ้ายใน frame 120x80) — ตอน flip_h ต้องกลับด้าน x เอง
 # เพราะ flip_h ไม่ได้ flip offset ให้ ลำตัวจะเลื่อนออกจาก origin
 const SPRITE_OFFSET := Vector2(6, -21)
-# ความเร็วต่ำกว่านี้ถือว่ายืนนิ่ง (เล่น idle) — กันแรงผลัก separation เล็กๆ ทำให้สลับ run/idle
+# ความเร็ว x ต่ำกว่านี้ไม่เปลี่ยนทิศที่หัน
 const ANIM_MOVE_THRESHOLD := 5.0
+# hysteresis ของ run/idle: เร็วกว่า RUN เปลี่ยนเป็น run, ช้ากว่า IDLE กลับเป็น idle กันสลับรัวๆ
+const ANIM_RUN_SPEED := 20.0
+const ANIM_IDLE_SPEED := 8.0
+
+# ประเภทการเดินในเฟรมนี้ — ใช้ตัดสินว่าจะใส่ separation ไหม และจะหันหน้าตามอะไร
+enum MoveMode { NONE, CHASE, FORMATION, RETURN }
 
 @onready var animated_sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var sight_area: Area2D = $SightArea
@@ -49,6 +58,11 @@ var state: HeroState = HeroState.SEEKING
 # ทุกเส้นทางการเดิน (ไล่ Enemy / formation / RETURNING / เดินขวา) ตั้งค่านี้ แล้วค่อยรวมกับแรงผลัก
 # และขยับจริงผ่าน move_and_slide() ครั้งเดียวต่อเฟรม
 var move_velocity := Vector2.ZERO
+# ความเร็วที่ค้างข้ามเฟรมของ formation/RETURNING (move_toward ต่อจากค่านี้) — ตอนทำอย่างอื่นจะ sync ตาม move_velocity
+# เพื่อให้ตอนสลับเข้า formation เริ่มจากความเร็วจริงที่เดินอยู่
+var formation_velocity := Vector2.ZERO
+var move_mode: MoveMode = MoveMode.NONE
+var is_running := false
 
 var enemies_in_sight: Array[Node2D] = []
 var enemies_in_attack_range: Array[Node2D] = []
@@ -100,8 +114,14 @@ func _physics_process(delta: float) -> void:
 		return
 
 	move_velocity = Vector2.ZERO
+	move_mode = MoveMode.NONE
 	_update_ai(delta)
-	velocity = move_velocity + _get_separation_velocity()
+	if move_mode != MoveMode.FORMATION and move_mode != MoveMode.RETURN:
+		formation_velocity = move_velocity
+	# separation เฉพาะตอนไล่ Enemy — ใน formation slot ห่างกัน 150px อยู่แล้ว แรงผลักเล็กๆ จะทำให้สั่น
+	velocity = move_velocity
+	if move_mode == MoveMode.CHASE:
+		velocity += _get_separation_velocity()
 	move_and_slide()
 	global_position = WORLD_SCRIPT.clamp_to_bounds(global_position)
 	_update_animation()
@@ -147,16 +167,22 @@ func _steer_toward(target: Vector2, speed: float, delta: float) -> void:
 	move_velocity = (target - global_position).limit_length(speed * delta) / delta
 
 
-# fallback ของ Hero ที่ไม่ได้ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินไป formation slot แล้วหยุดรอ
+# fallback ของ Hero ที่ไม่ได้ถูกเลือก เมื่อไม่มี Enemy ใน SightArea: เดินตาม formation slot ไปพร้อม leader
 func _move_to_formation_slot(delta: float) -> void:
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	if leader == null:
 		return
-	var slot := _get_formation_slot(leader)
-	if global_position.distance_to(slot) < FORMATION_ARRIVE_DISTANCE:
-		return
-	# ใช้ RETURN_SPEED เพราะต้องเร็วกว่า leader ที่เดินขวาอยู่ ไม่งั้นจะตามไม่ทัน slot
-	_steer_toward(slot, RETURN_SPEED, delta)
+	_follow_slot(leader, _get_formation_slot(leader), delta)
+	move_mode = MoveMode.FORMATION
+
+
+# feed-forward ความเร็ว leader + แก้ระยะห่างจาก slot แบบสัดส่วน — ใกล้ slot ส่วนแก้จะเหลือ ~0 แต่ยังเดินไปพร้อม leader
+# limit ที่ RETURN_SPEED (เร็วกว่า MOVE_SPEED ของ leader) และเปลี่ยนความเร็วไม่เกิน FORMATION_ACCEL
+func _follow_slot(leader: Node2D, slot: Vector2, delta: float) -> void:
+	var leader_velocity: Vector2 = leader.velocity
+	var desired := (leader_velocity + (slot - global_position) * FORMATION_CORRECTION_GAIN).limit_length(RETURN_SPEED)
+	formation_velocity = formation_velocity.move_toward(desired, FORMATION_ACCEL * delta)
+	move_velocity = formation_velocity
 
 
 # คำนวณใหม่ทุกครั้งที่เรียก จึงอัปเดตเองเมื่อเปลี่ยนตัวที่เลือก / มีการ recruit / มี Hero ตาย
@@ -187,6 +213,7 @@ func _find_nearest_enemy_in_sight() -> Node2D:
 # เดินตรงเข้าหา Enemy ตามเวกเตอร์ทิศทางจริง (ทั้งแกน X และ Y) จนกว่าจะเข้า AttackArea
 func _chase_enemy(target: Node2D, delta: float) -> void:
 	_steer_toward(target.global_position, MOVE_SPEED, delta)
+	move_mode = MoveMode.CHASE
 
 
 func _get_separation_velocity() -> Vector2:
@@ -229,7 +256,8 @@ func _update_leash(delta: float) -> void:
 
 	var slot := _get_formation_slot(leader)
 	if global_position.distance_to(slot) > RETURN_STOP_RANGE:
-		_steer_toward(slot, RETURN_SPEED, delta)
+		_follow_slot(leader, slot, delta)
+		move_mode = MoveMode.RETURN
 	else:
 		state = HeroState.SEEKING
 		sight_area.monitoring = true
@@ -259,6 +287,26 @@ func take_damage(amount: int) -> void:
 		animated_sprite.play("hit")
 
 
+# เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index / coin_count ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
+func reset_for_new_stage() -> void:
+	var was_dead := hp <= 0
+	hp = max_hp
+	state = HeroState.SEEKING
+	move_velocity = Vector2.ZERO
+	formation_velocity = Vector2.ZERO
+	velocity = Vector2.ZERO
+	is_running = false
+	attack_timer = 0.0
+	enemies_in_sight.clear()
+	enemies_in_attack_range.clear()
+	sight_area.monitoring = true
+	# _die() ไม่ได้ queue_free แค่ปิด collision / AttackArea — hp เต็มแล้วต้องเปิดคืน ไม่งั้นเดินได้แต่ตีไม่ได้
+	if was_dead:
+		$CollisionShape2D.disabled = false
+		attack_area.monitoring = true
+	animated_sprite.play("idle")
+
+
 # _physics_process หยุด AI/การเดินเองเมื่อ hp <= 0 — ตรงนี้ปิด collision/area แล้วรอ death เล่นจบ
 func _die() -> void:
 	velocity = Vector2.ZERO
@@ -272,16 +320,26 @@ func _die() -> void:
 
 # attack / hit เล่นจนจบก่อน แล้วค่อยกลับเป็น idle/run ตามความเร็ว
 func _update_animation() -> void:
-	if absf(velocity.x) > ANIM_MOVE_THRESHOLD:
+	var leader := get_tree().get_first_node_in_group("party_leader")
+	if move_mode == MoveMode.FORMATION and leader:
+		# ใน formation หันทางเดียวกับ leader — ไม่หันตาม velocity ที่ส่ายเล็กน้อยตอนแก้ตำแหน่ง
+		_set_facing_left(leader.animated_sprite.flip_h)
+	elif absf(velocity.x) > ANIM_MOVE_THRESHOLD:
 		_set_facing_left(velocity.x < 0)
 	else:
 		var target := _get_facing_target()
 		if target:
 			_set_facing_left(target.global_position.x < global_position.x)
 
+	var speed := velocity.length()
+	if is_running and speed < ANIM_IDLE_SPEED:
+		is_running = false
+	elif not is_running and speed > ANIM_RUN_SPEED:
+		is_running = true
+
 	if _is_playing_action("attack") or _is_playing_action("hit"):
 		return
-	if velocity.length() > ANIM_MOVE_THRESHOLD:
+	if is_running:
 		animated_sprite.play("run")
 	else:
 		animated_sprite.play("idle")

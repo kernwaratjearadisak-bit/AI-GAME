@@ -51,6 +51,22 @@ func recruit_hero() -> void:
 	hero.global_position = spawn_position + Vector2(0, RECRUIT_OFFSET)
 
 
+# เรียกจาก Main.reset_stage(): ไม่สร้าง Hero ใหม่ — reset ตัวเดิม แล้ววาง leader ที่ BASE_POSITION, follower ที่ formation slot
+func reset_for_new_stage() -> void:
+	var heroes := get_tree().get_nodes_in_group("heroes")
+	# reset hp ก่อน เพราะ _get_formation_slot นับเฉพาะ Hero ที่ hp > 0
+	for hero in heroes:
+		hero.reset_for_new_stage()
+
+	var leader := get_tree().get_first_node_in_group("party_leader")
+	if leader == null:
+		return
+	leader.global_position = BASE_POSITION
+	for hero in heroes:
+		if hero != leader:
+			hero.global_position = hero._get_formation_slot(leader)
+
+
 func _get_hitbox_height(hero: CharacterBody2D) -> float:
 	var collision_shape: CollisionShape2D = hero.get_node("CollisionShape2D")
 	var rect_shape: RectangleShape2D = collision_shape.shape
