@@ -89,7 +89,7 @@ position = Vector2(20, 110)
 size = Vector2(300, 40)
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Attack Speed: 1.0/s"
+text = "Attack interval: 0.77s"
 
 [node name="HeroesLabel" type="Label" parent="UI/HeroStatusPanel"]
 position = Vector2(20, 170)
@@ -102,6 +102,34 @@ text = "Heroes: 2/4"
 position = Vector2(20, 220)
 size = Vector2(200, 60)
 text = "Recruit"
+
+[node name="STRLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 20)
+size = Vector2(320, 40)
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "STR: 10"
+
+[node name="VITLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 65)
+size = Vector2(320, 40)
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "VIT: 10"
+
+[node name="AGILabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 110)
+size = Vector2(320, 40)
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "AGI: 10"
+
+[node name="DEFLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 155)
+size = Vector2(320, 40)
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "DEF: 9.09%"
 
 [node name="StageTitleLabel" type="Label" parent="UI"]
 visible = false

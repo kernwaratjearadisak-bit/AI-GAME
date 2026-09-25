@@ -44,9 +44,21 @@ enum MoveMode { NONE, CHASE, FORMATION, RETURN }
 @onready var attack_area: Area2D = $AttackArea
 @onready var selected_indicator: Polygon2D = $SelectedIndicator
 
-var hp: int = 100
-var max_hp: int = 100
-var attack_damage: int = 10
+var hp: float = 100.0
+var max_hp: float = 100.0
+var attack_damage: float = 10.0
+# STR / VIT / AGI — สูตรอยู่ใน CombatStats.gd
+@export var strength: int = 10
+@export var vitality: int = 10
+@export var agility: int = 10:
+	set(value):
+		agility = value
+		_update_attack_interval()
+# interval ก่อนคิด AGI — attack_interval จริงคำนวณใหม่จากค่านี้ทุกครั้ง ไม่คูณทับ
+@export var base_attack_interval: float = 1.0:
+	set(value):
+		base_attack_interval = value
+		_update_attack_interval()
 var attack_interval: float = 1.0
 var attack_timer: float = 0.0
 var coin_count: int = 0
@@ -70,6 +82,7 @@ var enemies_in_attack_range: Array[Node2D] = []
 
 func _ready() -> void:
 	add_to_group("heroes")
+	_update_attack_interval()
 	animated_sprite.play("idle")
 	var sight_shape: CircleShape2D = sight_area.get_node("CollisionShape2D").shape
 	sight_shape.radius = HERO_DETECT_RANGE
@@ -267,8 +280,8 @@ func _attack_current_target() -> void:
 	var target: Node2D = enemies_in_attack_range[0]
 	if not is_instance_valid(target):
 		return
-	animated_sprite.play("attack")
-	target.take_damage(attack_damage)
+	animated_sprite.play("attack", CombatStats.get_attack_anim_speed(animated_sprite, attack_interval))
+	target.take_damage(CombatStats.get_damage_output(attack_damage, strength))
 	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
 		var direction := global_position.direction_to(target.global_position)
 		if direction == Vector2.ZERO:
@@ -276,15 +289,19 @@ func _attack_current_target() -> void:
 		target.apply_knockback(direction * HERO_KNOCKBACK_DISTANCE, HERO_KNOCKBACK_DURATION)
 
 
-func take_damage(amount: int) -> void:
+func take_damage(amount: float) -> void:
 	if hp <= 0:
 		return
-	hp -= amount
+	hp = snappedf(hp - CombatStats.get_damage_received(amount, vitality), 0.01)
 	_flash_hit()
 	if hp <= 0:
 		_die()
 	elif not _is_playing_action("attack"):
 		animated_sprite.play("hit")
+
+
+func _update_attack_interval() -> void:
+	attack_interval = CombatStats.get_attack_interval(base_attack_interval, agility)
 
 
 # เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index / coin_count ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง

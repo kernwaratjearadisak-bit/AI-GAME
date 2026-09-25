@@ -1,7 +1,7 @@
 extends Node2D
 
 const MOVE_DURATION := 0.4
-const HP_POTION_HEAL_AMOUNT := 15
+const HP_POTION_HEAL_AMOUNT := 15.0
 
 var start_position := Vector2.ZERO
 var has_start_position := false
@@ -39,5 +39,5 @@ func _on_arrived() -> void:
 	# restore เฉพาะ Hero ที่ is_selected ตอนถึงตัวเท่านั้น และไม่ชุบชีวิต Hero ที่ตายไปแล้ว
 	var hero := _find_selected_hero()
 	if hero and hero.hp > 0:
-		hero.hp = mini(hero.hp + HP_POTION_HEAL_AMOUNT, hero.max_hp)
+		hero.hp = snappedf(minf(hero.hp + HP_POTION_HEAL_AMOUNT, hero.max_hp), 0.01)
 	queue_free()

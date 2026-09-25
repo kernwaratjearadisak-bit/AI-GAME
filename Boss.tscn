@@ -9,6 +9,8 @@ size = Vector2(152, 296)
 [node name="Boss" instance=ExtResource("1")]
 modulate = Color(1, 0.8, 0.8, 1)
 script = ExtResource("2")
+strength = 10
+vitality = 10
 
 [node name="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_boss")

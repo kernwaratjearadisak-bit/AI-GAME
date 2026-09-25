@@ -13,6 +13,8 @@ const BOSS_SPAWN_POSITION := Vector2(WORLD_SCRIPT.SIZE.x - 300.0, WORLD_SCRIPT.S
 const BOSS_SAFE_RADIUS := 800.0
 # หน่วงหลัง Boss ตายก่อนเริ่ม stage ใหม่
 const STAGE_RESET_DELAY := 1.0
+# ความยากต่อ stage: HP / attack ของ Enemy และ Boss = ค่าพื้นฐาน * STAGE_SCALING ^ (current_stage - 1)
+const STAGE_SCALING := 1.5
 # ข้อความ "Stage N" กลางจอตอนเริ่ม stage (วินาที)
 const STAGE_TITLE_FADE_IN := 0.3
 const STAGE_TITLE_HOLD := 1.2
@@ -51,15 +53,23 @@ func _ready() -> void:
 func _spawn_enemies() -> void:
 	for point in enemy_spawn_points:
 		var enemy := ENEMY_SCENE.instantiate()
+		enemy.setup(get_stage_multiplier())
 		enemy_container.add_child(enemy)
 		enemy.global_position = point
 
 
 func _spawn_boss() -> void:
 	boss = BOSS_SCENE.instantiate()
+	boss.setup(get_stage_multiplier())
 	enemy_container.add_child(boss)
 	boss.global_position = BOSS_SPAWN_POSITION
 	boss.boss_defeated.connect(_on_boss_defeated)
+
+
+# current_stage = stage_pass_count + 1 → Stage 1 = x1, Stage 2 = x1.5, Stage 3 = x2.25, ...
+func get_stage_multiplier() -> float:
+	var current_stage := stage_pass_count + 1
+	return pow(STAGE_SCALING, current_stage - 1)
 
 
 func _generate_random_spawn_points() -> Array[Vector2]:
@@ -127,7 +137,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not is_instance_valid(boss) or boss.hp <= 0:
 		return
 	if event.keycode == KEY_B:
-		boss.take_damage(boss.hp)
+		# damage ถูกหักด้วย VIT ของ Boss — ส่งเกินไว้มากๆ ให้ตายในครั้งเดียว
+		boss.take_damage(boss.max_hp * 100.0)
 	elif event.keycode == KEY_V:
 		var leader := get_tree().get_first_node_in_group("party_leader")
 		if leader:

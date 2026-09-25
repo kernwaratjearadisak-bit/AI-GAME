@@ -13,14 +13,30 @@ const ENEMY_DETECT_RANGE: float = preload("res://Hero.gd").HERO_DETECT_RANGE
 # ใช้ offset / threshold ชุดเดียวกับ Hero
 const SPRITE_OFFSET: Vector2 = preload("res://Hero.gd").SPRITE_OFFSET
 const ANIM_MOVE_THRESHOLD: float = preload("res://Hero.gd").ANIM_MOVE_THRESHOLD
+# ค่าพื้นฐานของ Stage 1 — setup() คูณ stage_multiplier จากค่านี้ทุกครั้ง ไม่คูณทับค่าเดิม
+const BASE_HP := 30.0
+const BASE_ATTACK := 5.0
 
 @onready var sprite: AnimatedSprite2D = $AnimatedSprite2D
 @onready var detect_area: Area2D = $DetectArea
 
-var hp: int = 30
+var hp: float = BASE_HP
+var max_hp: float = BASE_HP
 # Boss ตั้งค่าใหม่ใน _ready (const override ใน subclass ไม่ได้) — Enemy ปกติใช้ STOP_DISTANCE เหมือนเดิม
 var stop_distance: float = STOP_DISTANCE
-var attack_damage: int = 5
+var attack_damage: float = BASE_ATTACK
+# STR / VIT / AGI — สูตรอยู่ใน CombatStats.gd
+@export var strength: int = 5
+@export var vitality: int = 5
+@export var agility: int = 5:
+	set(value):
+		agility = value
+		_update_attack_interval()
+# interval ก่อนคิด AGI — attack_interval จริงคำนวณใหม่จากค่านี้ทุกครั้ง ไม่คูณทับ
+@export var base_attack_interval: float = 1.5:
+	set(value):
+		base_attack_interval = value
+		_update_attack_interval()
 var attack_interval: float = 1.5
 var attack_timer: float = 0.0
 var target_hero: Node2D = null
@@ -30,7 +46,20 @@ var knockback_tween: Tween = null
 var heroes_in_detect: Array[Node2D] = []
 
 
+# Main เรียกก่อน add_child — Stage 1 = x1, Stage 2 = x1.5, ...
+func setup(stage_multiplier: float) -> void:
+	max_hp = snappedf(_get_base_hp() * stage_multiplier, 0.01)
+	hp = max_hp
+	attack_damage = snappedf(BASE_ATTACK * stage_multiplier, 0.01)
+
+
+# Boss override เพื่อคูณ HP ก่อนคูณ stage_multiplier
+func _get_base_hp() -> float:
+	return BASE_HP
+
+
 func _ready() -> void:
+	_update_attack_interval()
 	var detect_shape: CircleShape2D = detect_area.get_node("CollisionShape2D").shape
 	detect_shape.radius = ENEMY_DETECT_RANGE
 	detect_area.body_entered.connect(_on_detect_area_body_entered)
@@ -86,8 +115,12 @@ func _attack_target(delta: float) -> void:
 	attack_timer += delta
 	if attack_timer >= attack_interval:
 		attack_timer = 0.0
-		sprite.play("attack")
-		target_hero.take_damage(attack_damage)
+		sprite.play("attack", CombatStats.get_attack_anim_speed(sprite, attack_interval))
+		target_hero.take_damage(CombatStats.get_damage_output(attack_damage, strength))
+
+
+func _update_attack_interval() -> void:
+	attack_interval = CombatStats.get_attack_interval(base_attack_interval, agility)
 
 
 func apply_knockback(offset: Vector2, duration: float) -> void:
@@ -101,10 +134,10 @@ func apply_knockback(offset: Vector2, duration: float) -> void:
 	knockback_tween.finished.connect(func() -> void: is_knocked_back = false)
 
 
-func take_damage(amount: int) -> void:
+func take_damage(amount: float) -> void:
 	if hp <= 0:
 		return
-	hp -= amount
+	hp = snappedf(hp - CombatStats.get_damage_received(amount, vitality), 0.01)
 	_flash_hit()
 	if hp <= 0:
 		_spawn_coin()

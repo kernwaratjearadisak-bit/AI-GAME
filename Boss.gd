@@ -13,8 +13,12 @@ const BOSS_STOP_DISTANCE := 150.0
 
 func _ready() -> void:
 	super()
-	hp *= BOSS_HP_MULTIPLIER
 	stop_distance = BOSS_STOP_DISTANCE
+
+
+# HP x2 ของ Enemy ปกติ แล้ว setup() ค่อยคูณ stage_multiplier ทับ — attack ใช้ BASE_ATTACK เท่า Enemy ปกติ
+func _get_base_hp() -> float:
+	return BASE_HP * BOSS_HP_MULTIPLIER
 
 
 func _die() -> void:
