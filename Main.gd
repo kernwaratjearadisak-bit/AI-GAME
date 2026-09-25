@@ -3,9 +3,19 @@ extends Node2D
 const ENEMY_SCENE := preload("res://Enemy.tscn")
 const BOSS_SCENE := preload("res://Boss.tscn")
 const WORLD_SCRIPT := preload("res://World.gd")
-const RANDOM_ENEMY_COUNT_MIN := 15
-const RANDOM_ENEMY_COUNT_MAX := 20
-# กันไม่ให้ Enemy เกิดชิดขอบโลก หรือเกิดทับจุดเริ่มของ Hero
+# Enemy เกิดเป็นกลุ่ม: สุ่มจำนวน "จุดศูนย์กลางกลุ่ม" แล้ววาง ENEMIES_PER_GROUP ตัวรอบแต่ละจุด → 45-60 ตัวต่อ stage
+const RANDOM_GROUP_COUNT_MIN := 15
+const RANDOM_GROUP_COUNT_MAX := 20
+const ENEMIES_PER_GROUP := 3
+# สมาชิกวางเป็นสามเหลี่ยมรอบศูนย์กลาง: รัศมีสุ่ม 70-100% ของ GROUP_SPREAD_RADIUS (84-120px) มุมสุ่มเลื่อน ±15°
+# กรณีใกล้กันสุด = มุมห่าง 90° รัศมี 84 ทั้งคู่ → 2 * 84 * sin(45°) ≈ 119px ≥ 90 (ลำตัวกว้าง 76) ไม่ยืนทับกัน
+const GROUP_SPREAD_RADIUS := 120.0
+const GROUP_SPREAD_MIN_RATIO := 0.7
+const GROUP_ANGLE_JITTER := PI / 12.0  # 15°
+# ศูนย์กลางกลุ่มห่างกันอย่างน้อยเท่านี้ — สุ่มครบ GROUP_PLACEMENT_ATTEMPTS ครั้งแล้วยังไม่ได้ ใช้จุดที่ห่างที่สุดที่เจอแทน
+const GROUP_MIN_SPACING := 400.0
+const GROUP_PLACEMENT_ATTEMPTS := 30
+# กันไม่ให้กลุ่ม Enemy เกิดชิดขอบโลก หรือเกิดทับจุดเริ่มของ Hero
 const WORLD_EDGE_MARGIN := 200.0
 const HERO_SAFE_RADIUS := 800.0
 # Boss อยู่สุด World ทางขวา กึ่งกลางแนวตั้ง — Enemy ปกติไม่เกิดในรัศมี BOSS_SAFE_RADIUS รอบ Boss
@@ -23,10 +33,10 @@ const STAGE_TITLE_FADE_OUT := 0.5
 const DEBUG_BOSS_KEYS := true
 const DEBUG_BOSS_NEAR_OFFSET := Vector2(500, 0)
 
-# ตำแหน่งเกิดของ Enemy ทั้งหมด (พิกัด World)
+# จุดศูนย์กลางกลุ่ม Enemy (พิกัด World) — แต่ละจุด spawn ENEMIES_PER_GROUP ตัวรอบๆ
 # ถ้าอยากกำหนดตำแหน่งตายตัว ให้ใส่ค่าลงใน array นี้ได้เลย เช่น
-#   Vector2(500, 300), Vector2(1200, 4800), ...
-# ถ้า array ว่าง จะสุ่มตำแหน่งกระจายทั่ว World ให้แทน และสุ่มใหม่ทุก stage
+#   Vector2(500, 300), Vector2(1200, 800), ...
+# ถ้า array ว่าง จะสุ่มจุดศูนย์กลางกระจายทั่ว World ให้แทน และสุ่มใหม่ทุก stage
 var enemy_spawn_points: Array[Vector2] = []
 var stage_pass_count := 0
 
@@ -52,11 +62,26 @@ func _ready() -> void:
 
 
 func _spawn_enemies() -> void:
-	for point in enemy_spawn_points:
-		var enemy := ENEMY_SCENE.instantiate()
-		enemy.setup(get_stage_multiplier())
-		enemy_container.add_child(enemy)
-		enemy.global_position = point
+	var enemy_count := 0
+	for center in enemy_spawn_points:
+		for point in _get_group_member_positions(center):
+			var enemy := ENEMY_SCENE.instantiate()
+			enemy.setup(get_stage_multiplier())
+			enemy_container.add_child(enemy)
+			enemy.global_position = point
+			enemy_count += 1
+	print("Stage %d: spawned %d groups, %d enemies" % [stage_pass_count + 1, enemy_spawn_points.size(), enemy_count])
+
+
+# สามเหลี่ยมรอบศูนย์กลาง หมุนสุ่มทั้งกลุ่ม + สุ่มเลื่อนแต่ละตัวเล็กน้อย (ดูระยะขั้นต่ำที่ GROUP_SPREAD_RADIUS)
+func _get_group_member_positions(center: Vector2) -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	var base_angle := randf() * TAU
+	for i in ENEMIES_PER_GROUP:
+		var angle := base_angle + i * TAU / ENEMIES_PER_GROUP + randf_range(-GROUP_ANGLE_JITTER, GROUP_ANGLE_JITTER)
+		var radius := GROUP_SPREAD_RADIUS * randf_range(GROUP_SPREAD_MIN_RATIO, 1.0)
+		positions.append(WORLD_SCRIPT.clamp_to_bounds(center + Vector2.from_angle(angle) * radius))
+	return positions
 
 
 func _spawn_boss() -> void:
@@ -73,23 +98,45 @@ func get_stage_multiplier() -> float:
 	return pow(STAGE_SCALING, current_stage - 1)
 
 
+# คืนจุดศูนย์กลางกลุ่ม — ระยะห่างระหว่างกลุ่มเป็นเงื่อนไขแบบ "พยายาม" (ไม่วนไม่จบ) ส่วนขอบโลก / Hero / Boss เป็นเงื่อนไขบังคับ
 func _generate_random_spawn_points() -> Array[Vector2]:
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	var hero_start: Vector2 = leader.global_position if leader else Vector2(-INF, -INF)
-	var count := randi_range(RANDOM_ENEMY_COUNT_MIN, RANDOM_ENEMY_COUNT_MAX)
+	var count := randi_range(RANDOM_GROUP_COUNT_MIN, RANDOM_GROUP_COUNT_MAX)
 
-	var points: Array[Vector2] = []
-	while points.size() < count:
+	var centers: Array[Vector2] = []
+	for _i in count:
+		var best_point := Vector2.ZERO
+		var best_gap := -1.0
+		for _attempt in GROUP_PLACEMENT_ATTEMPTS:
+			var point := _random_group_center(hero_start)
+			var gap := _distance_to_nearest(point, centers)
+			if gap > best_gap:
+				best_gap = gap
+				best_point = point
+			if gap >= GROUP_MIN_SPACING:
+				break
+		centers.append(best_point)
+	return centers
+
+
+# สุ่มจนได้จุดที่ผ่านเงื่อนไขบังคับ — พื้นที่ที่ผ่านกว้างมาก (World 14400x1280 ตัดแค่วงกลม 2 วง) จึงเจอเร็ว
+func _random_group_center(hero_start: Vector2) -> Vector2:
+	while true:
 		var point := Vector2(
 			randf_range(WORLD_EDGE_MARGIN, WORLD_SCRIPT.SIZE.x - WORLD_EDGE_MARGIN),
 			randf_range(WORLD_EDGE_MARGIN, WORLD_SCRIPT.SIZE.y - WORLD_EDGE_MARGIN)
 		)
-		if point.distance_to(hero_start) < HERO_SAFE_RADIUS:
-			continue
-		if point.distance_to(BOSS_SPAWN_POSITION) < BOSS_SAFE_RADIUS:
-			continue
-		points.append(point)
-	return points
+		if point.distance_to(hero_start) >= HERO_SAFE_RADIUS and point.distance_to(BOSS_SPAWN_POSITION) >= BOSS_SAFE_RADIUS:
+			return point
+	return Vector2.ZERO
+
+
+func _distance_to_nearest(point: Vector2, others: Array[Vector2]) -> float:
+	var nearest := INF
+	for other in others:
+		nearest = minf(nearest, point.distance_to(other))
+	return nearest
 
 
 func _on_boss_defeated() -> void:
