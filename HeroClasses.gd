@@ -1,0 +1,27 @@
+class_name HeroClasses
+extends RefCounted
+
+# ข้อมูล class ของ Hero เก็บที่เดียว — base stat (HP, attack_damage, STR/VIT/AGI) เหมือนกันทุก class
+enum HeroClass { WARRIOR, ARCHER }
+
+# attack_range_multiplier: คูณรัศมี AttackArea เดิมใน Hero.tscn
+# attack_speed_multiplier: < 1 = ตีช้าลง (base interval ของ class = base_attack_interval / ค่านี้)
+# tint: ใส่ที่ self_modulate ของ sprite (modulate ใช้ flash ตอนโดนตี)
+const CONFIGS := {
+	HeroClass.WARRIOR: {
+		"display_name": "Warrior",
+		"attack_range_multiplier": 1.0,
+		"attack_speed_multiplier": 1.0,
+		"tint": Color(1, 1, 1),
+	},
+	HeroClass.ARCHER: {
+		"display_name": "Archer",
+		"attack_range_multiplier": 4.0,
+		"attack_speed_multiplier": 0.7,
+		"tint": Color(0.7, 1.0, 0.7),
+	},
+}
+
+
+static func get_config(hero_class: HeroClass) -> Dictionary:
+	return CONFIGS[hero_class]

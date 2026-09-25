@@ -1,8 +1,9 @@
 extends Node2D
 
-# node กลางของ effect ใน World (ตัวเลข damage ฯลฯ) — ไม่ add เข้าตัวที่โดนตี เพราะถ้าตัวนั้นตาย/ถูก free effect จะหายตาม
+# node กลางของ effect ใน World (ตัวเลข damage, ลูกธนู ฯลฯ) — ไม่ add เข้าตัวที่โดนตี เพราะถ้าตัวนั้นตาย/ถูก free effect จะหายตาม
 # Main.reset_stage() เคลียร์ลูกทั้งหมดของ node นี้
 const DAMAGE_NUMBER_SCENE := preload("res://DamageNumber.tscn")
+const ARROW_SCENE := preload("res://Arrow.tscn")
 # ระยะเหนือขอบบนของ collision + สุ่มเลื่อนแกน X กันตัวเลขซ้อนกันตอนโดนตีรัวๆ
 const HEAD_MARGIN := 10.0
 const RANDOM_X_OFFSET := 20.0
@@ -20,6 +21,13 @@ func spawn_damage_number(target: Node2D, amount: float, color: Color) -> void:
 		-(_get_half_height(target) + HEAD_MARGIN)
 	)
 	number.setup(amount, color)
+
+
+# ลูกธนูของ Archer (ภาพอย่างเดียว) — บินจาก start_position ตาม target
+func spawn_arrow(target: Node2D, start_position: Vector2) -> void:
+	var arrow := ARROW_SCENE.instantiate()
+	add_child(arrow)
+	arrow.setup(target, start_position)
 
 
 # ครึ่งความสูงของ collision (RectangleShape2D อยู่กึ่งกลาง origin) — Boss ตัวใหญ่ ตัวเลขจึงเกิดสูงกว่าเอง

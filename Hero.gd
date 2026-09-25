@@ -39,6 +39,8 @@ const ANIM_RUN_SPEED := 20.0
 const ANIM_IDLE_SPEED := 8.0
 # ราคาอัป STR / VIT / AGI +1 (หักจาก coin กองกลางใน HeroParty)
 const STAT_UPGRADE_COST := 5
+# จุดปล่อยลูกธนูของ Archer เทียบกับ origin (กลางลำตัว) ตอนหันขวา: ระดับอก เยื้องไปข้างหน้าเล็กน้อย — หันซ้ายกลับด้าน x
+const ARROW_RELEASE_OFFSET := Vector2(24, -24)
 
 # ประเภทการเดินในเฟรมนี้ — ใช้ตัดสินว่าจะใส่ separation ไหม และจะหันหน้าตามอะไร
 enum MoveMode { NONE, CHASE, FORMATION, RETURN }
@@ -51,6 +53,8 @@ enum MoveMode { NONE, CHASE, FORMATION, RETURN }
 var hp: float = 100.0
 var max_hp: float = 100.0
 var attack_damage: float = 10.0
+# HeroParty ตั้งก่อน add_child — _ready() ปรับ attack range / interval / tint ตาม HeroClasses
+var hero_class: HeroClasses.HeroClass = HeroClasses.HeroClass.WARRIOR
 # STR / VIT / AGI — สูตรอยู่ใน CombatStats.gd
 @export var strength: int = 10
 @export var vitality: int = 10
@@ -58,7 +62,7 @@ var attack_damage: float = 10.0
 	set(value):
 		agility = value
 		_update_attack_interval()
-# interval ก่อนคิด AGI — attack_interval จริงคำนวณใหม่จากค่านี้ทุกครั้ง ไม่คูณทับ
+# interval ก่อนคิด class และ AGI — attack_interval จริงคำนวณใหม่จากค่านี้ทุกครั้ง ไม่คูณทับ
 @export var base_attack_interval: float = 1.0:
 	set(value):
 		base_attack_interval = value
@@ -85,6 +89,7 @@ var enemies_in_attack_range: Array[Node2D] = []
 
 func _ready() -> void:
 	add_to_group("heroes")
+	_apply_hero_class()
 	_update_attack_interval()
 	animated_sprite.play("idle")
 	var sight_shape: CircleShape2D = sight_area.get_node("CollisionShape2D").shape
@@ -285,6 +290,8 @@ func _attack_current_target() -> void:
 		return
 	animated_sprite.play("attack", CombatStats.get_attack_anim_speed(animated_sprite, attack_interval))
 	# STR → สุ่ม ±20% → (ฝั่งที่โดนตี) หัก VIT ใน take_damage
+	if hero_class == HeroClasses.HeroClass.ARCHER:
+		_spawn_arrow(target)
 	target.take_damage(CombatStats.roll_damage(CombatStats.get_damage_output(attack_damage, strength)))
 	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
 		var direction := global_position.direction_to(target.global_position)
@@ -326,7 +333,23 @@ func try_upgrade_stat(stat_name: StringName) -> bool:
 
 
 func _update_attack_interval() -> void:
-	attack_interval = CombatStats.get_attack_interval(base_attack_interval, agility)
+	attack_interval = CombatStats.get_attack_interval(_get_class_base_interval(), agility)
+
+
+# Archer ตีช้าลง 30%: 1.0 / 0.7 ≈ 1.43 วิ ก่อนคิด AGI
+func _get_class_base_interval() -> float:
+	return base_attack_interval / HeroClasses.get_config(hero_class)["attack_speed_multiplier"]
+
+
+func _apply_hero_class() -> void:
+	var config := HeroClasses.get_config(hero_class)
+	# shape ใน Hero.tscn เป็น sub_resource ที่ Hero ทุกตัวใช้ร่วมกัน — duplicate ก่อน ไม่งั้นแก้ทีเดียวเปลี่ยนทุกตัว
+	# คูณจากรัศมีใน scene ของ instance นี้ (ใหม่ทุกครั้ง) จึงไม่คูณทับซ้ำ
+	var attack_collision: CollisionShape2D = attack_area.get_node("CollisionShape2D")
+	var attack_shape: CircleShape2D = attack_collision.shape.duplicate()
+	attack_shape.radius *= config["attack_range_multiplier"]
+	attack_collision.shape = attack_shape
+	animated_sprite.self_modulate = config["tint"]
 
 
 # เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
@@ -401,6 +424,17 @@ func _get_facing_target() -> Node2D:
 func _set_facing_left(left: bool) -> void:
 	animated_sprite.flip_h = left
 	animated_sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
+
+
+# ภาพอย่างเดียว — damage ยังทำทันทีใน _attack_current_target()
+func _spawn_arrow(target: Node2D) -> void:
+	var effects := get_tree().get_first_node_in_group("effects")
+	if effects == null:
+		return
+	var release_offset := ARROW_RELEASE_OFFSET
+	if animated_sprite.flip_h:
+		release_offset.x = -release_offset.x
+	effects.spawn_arrow(target, global_position + release_offset)
 
 
 func _spawn_damage_number(amount: float) -> void:

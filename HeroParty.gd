@@ -22,6 +22,7 @@ func _ready() -> void:
 	add_to_group("hero_party")
 
 	var hero: CharacterBody2D = HERO_SCENE.instantiate()
+	hero.hero_class = HeroClasses.HeroClass.WARRIOR
 	hero.recruit_index = next_recruit_index
 	next_recruit_index += 1
 	add_child(hero)
@@ -43,7 +44,8 @@ func _ready() -> void:
 	#heroes[0].select()
 
 
-func recruit_hero() -> void:
+# MAX_HEROES นับรวมทุก class — recruit_index / formation ไม่ขึ้นกับ class
+func recruit_hero(hero_class: HeroClasses.HeroClass) -> void:
 	if get_tree().get_nodes_in_group("heroes").size() >= MAX_HEROES:
 		return
 
@@ -51,6 +53,7 @@ func recruit_hero() -> void:
 	var spawn_position: Vector2 = leader.global_position if leader else BASE_POSITION
 
 	var hero: CharacterBody2D = HERO_SCENE.instantiate()
+	hero.hero_class = hero_class
 	hero.recruit_index = next_recruit_index
 	next_recruit_index += 1
 	add_child(hero)

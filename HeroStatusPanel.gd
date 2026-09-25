@@ -14,11 +14,14 @@ const STAT_UPGRADE_COST: int = preload("res://Hero.gd").STAT_UPGRADE_COST
 @onready var str_plus_button: Button = $STRPlusButton
 @onready var vit_plus_button: Button = $VITPlusButton
 @onready var agi_plus_button: Button = $AGIPlusButton
-@onready var recruit_button: Button = $RecruitButton
+@onready var class_label: Label = $ClassLabel
+@onready var recruit_warrior_button: Button = $RecruitWarriorButton
+@onready var recruit_archer_button: Button = $RecruitArcherButton
 
 
 func _ready() -> void:
-	recruit_button.pressed.connect(_on_recruit_pressed)
+	recruit_warrior_button.pressed.connect(_on_recruit_pressed.bind(HeroClasses.HeroClass.WARRIOR))
+	recruit_archer_button.pressed.connect(_on_recruit_pressed.bind(HeroClasses.HeroClass.ARCHER))
 	str_plus_button.pressed.connect(_on_stat_plus_pressed.bind(&"strength"))
 	vit_plus_button.pressed.connect(_on_stat_plus_pressed.bind(&"vitality"))
 	agi_plus_button.pressed.connect(_on_stat_plus_pressed.bind(&"agility"))
@@ -27,7 +30,8 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	if leader:
-		# ค่าจริงหลังคิด stat แล้ว (สูตรใน CombatStats.gd)
+		class_label.text = "Class: %s" % HeroClasses.get_config(leader.hero_class)["display_name"]
+		# ค่าจริงหลังคิด stat แล้ว (สูตรใน CombatStats.gd) — attack_interval คิด class + AGI แล้ว
 		atk_label.text = "ATK: %.2f" % CombatStats.get_damage_output(leader.attack_damage, leader.strength)
 		hp_max_label.text = "HP Max: %.2f" % leader.max_hp
 		atk_speed_label.text = "Attack interval: %.2fs" % leader.attack_interval
@@ -43,19 +47,22 @@ func _process(_delta: float) -> void:
 	vit_plus_button.disabled = not can_upgrade
 	agi_plus_button.disabled = not can_upgrade
 
+	# MAX_HEROES นับรวมทุก class — ครบแล้ว disable ทั้งสองปุ่ม
 	var hero_count := get_tree().get_nodes_in_group("heroes").size()
-	if hero_count >= MAX_HEROES:
+	var is_full := hero_count >= MAX_HEROES
+	if is_full:
 		heroes_label.text = "Heroes: %d/%d (Max)" % [hero_count, MAX_HEROES]
-		recruit_button.disabled = true
 	else:
 		heroes_label.text = "Heroes: %d/%d" % [hero_count, MAX_HEROES]
-		recruit_button.disabled = false
+	recruit_warrior_button.disabled = is_full
+	recruit_archer_button.disabled = is_full
 
 
-func _on_recruit_pressed() -> void:
+func _on_recruit_pressed(hero_class: HeroClasses.HeroClass) -> void:
 	var hero_party := get_tree().get_first_node_in_group("hero_party")
 	if hero_party:
-		hero_party.recruit_hero()
+		hero_party.recruit_hero(hero_class)
+
 
 # อัป stat ของ Hero ที่ถูกเลือก ด้วย coin กองกลาง — logic อยู่ใน Hero.try_upgrade_stat()
 func _on_stat_plus_pressed(stat_name: StringName) -> void:

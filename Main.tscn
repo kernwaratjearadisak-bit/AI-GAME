@@ -75,37 +75,53 @@ color = Color(0.12, 0.12, 0.12, 0.9)
 script = ExtResource("6")
 
 [node name="ATKLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 20)
+position = Vector2(20, 65)
 size = Vector2(300, 40)
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "ATK: 10"
 
 [node name="HPMaxLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 65)
+position = Vector2(20, 110)
 size = Vector2(300, 40)
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "HP Max: 100"
 
 [node name="AttackSpeedLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 110)
+position = Vector2(20, 155)
 size = Vector2(300, 40)
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "Attack interval: 0.77s"
 
 [node name="HeroesLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 170)
+position = Vector2(20, 200)
 size = Vector2(300, 40)
 theme_override_font_sizes/font_size = 28
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "Heroes: 2/4"
 
-[node name="RecruitButton" type="Button" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 220)
-size = Vector2(200, 60)
-text = "Recruit"
+[node name="ClassLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(20, 20)
+size = Vector2(300, 40)
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Class: Warrior"
+
+[node name="RecruitWarriorButton" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(20, 320)
+size = Vector2(330, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 30
+text = "Recruit Warrior"
+
+[node name="RecruitArcherButton" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(370, 320)
+size = Vector2(330, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 30
+text = "Recruit Archer"
 
 [node name="STRLabel" type="Label" parent="UI/HeroStatusPanel"]
 position = Vector2(380, 10)
