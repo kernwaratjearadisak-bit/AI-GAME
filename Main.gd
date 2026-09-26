@@ -68,7 +68,8 @@ func _spawn_enemies() -> void:
 			var enemy := ENEMY_SCENE.instantiate()
 			enemy.setup(get_stage_multiplier())
 			enemy_container.add_child(enemy)
-			enemy.global_position = point
+			# ใช้แค่ x ของจุดที่สุ่มได้ — y วางบนพื้นเสมอ
+			WORLD_SCRIPT.place_on_ground(enemy, point.x)
 			enemy_count += 1
 	print("Stage %d: spawned %d groups, %d enemies" % [stage_pass_count + 1, enemy_spawn_points.size(), enemy_count])
 
@@ -88,7 +89,7 @@ func _spawn_boss() -> void:
 	boss = BOSS_SCENE.instantiate()
 	boss.setup(get_stage_multiplier())
 	enemy_container.add_child(boss)
-	boss.global_position = BOSS_SPAWN_POSITION
+	WORLD_SCRIPT.place_on_ground(boss, BOSS_SPAWN_POSITION.x)
 	boss.boss_defeated.connect(_on_boss_defeated)
 
 
@@ -193,4 +194,4 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.keycode == KEY_V:
 		var leader := get_tree().get_first_node_in_group("party_leader")
 		if leader:
-			boss.global_position = WORLD_SCRIPT.clamp_to_bounds(leader.global_position + DEBUG_BOSS_NEAR_OFFSET)
+			WORLD_SCRIPT.place_on_ground(boss, leader.global_position.x + DEBUG_BOSS_NEAR_OFFSET.x)

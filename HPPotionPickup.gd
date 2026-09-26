@@ -1,18 +1,18 @@
-extends Node2D
+extends "res://Pickup.gd"
 
 const MOVE_DURATION := 0.4
 const HP_POTION_HEAL_AMOUNT := 15.0
 
 var start_position := Vector2.ZERO
-var has_start_position := false
 
 
-func _ready() -> void:
+func _fly_to_target() -> void:
 	if _find_selected_hero() == null:
 		queue_free()
 		return
 
 	# ไล่ตามตำแหน่งปัจจุบันของ Hero ที่ถูกเลือกทุกเฟรม (Hero เดินอยู่ ถ้าล็อกเป้าไว้ตั้งแต่แรกจะไปไม่ถึงตัว)
+	start_position = global_position
 	var tween := create_tween()
 	tween.tween_method(_move_toward_selected_hero, 0.0, 1.0, MOVE_DURATION)
 	tween.finished.connect(_on_arrived)
@@ -26,10 +26,6 @@ func _find_selected_hero() -> Node2D:
 
 
 func _move_toward_selected_hero(weight: float) -> void:
-	# จับจุดเริ่มตอนเฟรมแรกของ tween เพราะ Enemy ตั้ง global_position หลัง add_child (หลัง _ready)
-	if not has_start_position:
-		start_position = global_position
-		has_start_position = true
 	var hero := _find_selected_hero()
 	if hero:
 		global_position = start_position.lerp(hero.global_position, weight)

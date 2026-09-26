@@ -7,15 +7,25 @@ const HERO_SCENE := preload("res://Hero.tscn")
 const HERO_COUNT := 2
 const MAX_HEROES := 4
 const LANE_GAP := 40.0
-const RECRUIT_OFFSET := 30.0
-# จุดเกิดในพิกัด World (ขนาด 14400x1280): ชิดซ้าย กึ่งกลางแนวตั้ง
+const WORLD_SCRIPT := preload("res://World.gd")
+# จุดเกิดในพิกัด World (ขนาด 14400x1280): ชิดซ้าย — ใช้แค่ x, y วางบนพื้นด้วย World.place_on_ground()
 const BASE_POSITION := Vector2(1000, 640)
+# formation_facing เปลี่ยนเมื่อ leader เดินไปทิศใหม่ต่อเนื่องเกินเวลานี้ หรือเกินระยะนี้ (อย่างใดอย่างหนึ่งก่อน)
+const FORMATION_TURN_TIME := 0.5
+const FORMATION_TURN_DISTANCE := 100.0
+# leader เร็วต่ำกว่านี้ = ไม่ได้เดิน (ยืนตี / หยุด) → ล้างตัวนับ ไม่สลับแถว
+const FORMATION_TURN_MIN_SPEED: float = preload("res://Hero.gd").ANIM_MOVE_THRESHOLD
 
 # ตัวแรกตั้งแต่ต้นเกม = 0 ตัวที่ recruit เพิ่มได้ 1, 2, 3 ตามลำดับ
 var next_recruit_index := 0
 # coin กองกลาง — อ่าน/แก้ผ่าน add_coins / can_afford / spend_coins เท่านั้น
 # HeroParty ไม่ถูกสร้างใหม่ตอน reset_stage จึงคงอยู่ข้าม stage
 var party_coins: int = 0
+# ทิศที่แถวหัน (1 = ขวา, -1 = ซ้าย) — follower ยืนฝั่งตรงข้าม; แยกจาก flip_h ของ leader ที่หันไปมาตอนตี
+var formation_facing := 1.0
+# ตัวนับ hysteresis ตอน leader เดินสวนทิศ formation_facing อยู่
+var turn_time := 0.0
+var turn_distance := 0.0
 
 
 func _ready() -> void:
@@ -26,7 +36,7 @@ func _ready() -> void:
 	hero.recruit_index = next_recruit_index
 	next_recruit_index += 1
 	add_child(hero)
-	hero.global_position = BASE_POSITION
+	WORLD_SCRIPT.place_on_ground(hero, BASE_POSITION.x)
 	hero.select()
 
 	# TODO: เปิดกลับมาใช้หลังตรรกะการโจมตีนิ่งแล้ว — spawn Hero ตัวที่ 2-4 เรียงเป็นเลน
@@ -44,6 +54,33 @@ func _ready() -> void:
 	#heroes[0].select()
 
 
+func _physics_process(delta: float) -> void:
+	_update_formation_facing(delta)
+
+
+# ดูแค่ velocity.x ของ leader (ไม่ใช่ทิศที่หัน) — ยืนตีหันซ้ายขวาไม่ทำให้แถวสลับ
+# ต้องเดินสวนทิศเดิมต่อเนื่อง: หยุดหรือกลับไปเดินทิศเดิมเมื่อไหร่ ล้างตัวนับ
+func _update_formation_facing(delta: float) -> void:
+	var leader := get_tree().get_first_node_in_group("party_leader")
+	if leader == null:
+		_reset_formation_turn()
+		return
+	var leader_velocity_x: float = leader.velocity.x
+	if absf(leader_velocity_x) < FORMATION_TURN_MIN_SPEED or signf(leader_velocity_x) == formation_facing:
+		_reset_formation_turn()
+		return
+	turn_time += delta
+	turn_distance += absf(leader_velocity_x) * delta
+	if turn_time > FORMATION_TURN_TIME or turn_distance > FORMATION_TURN_DISTANCE:
+		formation_facing = signf(leader_velocity_x)
+		_reset_formation_turn()
+
+
+func _reset_formation_turn() -> void:
+	turn_time = 0.0
+	turn_distance = 0.0
+
+
 # MAX_HEROES นับรวมทุก class — recruit_index / formation ไม่ขึ้นกับ class
 func recruit_hero(hero_class: HeroClasses.HeroClass) -> void:
 	if get_tree().get_nodes_in_group("heroes").size() >= MAX_HEROES:
@@ -57,7 +94,7 @@ func recruit_hero(hero_class: HeroClasses.HeroClass) -> void:
 	hero.recruit_index = next_recruit_index
 	next_recruit_index += 1
 	add_child(hero)
-	hero.global_position = spawn_position + Vector2(0, RECRUIT_OFFSET)
+	WORLD_SCRIPT.place_on_ground(hero, spawn_position.x)
 
 
 func add_coins(amount: int) -> void:
@@ -88,10 +125,13 @@ func reset_for_new_stage() -> void:
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	if leader == null:
 		return
-	leader.global_position = BASE_POSITION
+	WORLD_SCRIPT.place_on_ground(leader, BASE_POSITION.x)
+	# เริ่ม stage หันขวา → follower เรียงอยู่ทางซ้ายของ leader
+	formation_facing = 1.0
+	_reset_formation_turn()
 	for hero in heroes:
 		if hero != leader:
-			hero.global_position = hero._get_formation_slot(leader)
+			WORLD_SCRIPT.place_on_ground(hero, hero._get_formation_slot(leader).x)
 
 
 func _get_hitbox_height(hero: CharacterBody2D) -> float:

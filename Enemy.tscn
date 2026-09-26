@@ -6,11 +6,11 @@
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(76, 148)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_detect"]
-radius = 400.0
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_detect"]
+size = Vector2(800, 600)
 
 [node name="Enemy" type="CharacterBody2D"]
-collision_layer = 2
+collision_layer = 4
 collision_mask = 1
 script = ExtResource("1")
 
@@ -26,8 +26,8 @@ offset = Vector2(6, -21)
 
 [node name="DetectArea" type="Area2D" parent="."]
 collision_layer = 0
-collision_mask = 4
+collision_mask = 2
 input_pickable = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="DetectArea"]
-shape = SubResource("CircleShape2D_detect")
+shape = SubResource("RectangleShape2D_detect")

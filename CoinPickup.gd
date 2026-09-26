@@ -1,4 +1,4 @@
-extends Node2D
+extends "res://Pickup.gd"
 
 const MOVE_DURATION := 0.4
 const COIN_VALUE := 1
@@ -7,7 +7,7 @@ const COIN_VALUE := 1
 var is_collected := false
 
 
-func _ready() -> void:
+func _fly_to_target() -> void:
 	# ลอยไปหา leader เพื่อความสวยงามเท่านั้น — coin เข้ากองกลางของ party เสมอ ไม่ขึ้นกับ leader
 	var leader := get_tree().get_first_node_in_group("party_leader")
 	if leader == null:
@@ -25,7 +25,7 @@ func _on_arrived() -> void:
 	queue_free()
 
 
-# ถูกลบก่อนลอยถึง (เช่น reset_stage เคลียร์ $Enemies) ก็ยังนับเข้ากองกลาง ไม่ทิ้ง
+# ถูกลบก่อนลอยถึง (เช่น reset_stage เคลียร์ $Enemies) ก็ยังนับเข้ากองกลาง ไม่ทิ้ง — รวมช่วงที่ยังตก/นอนอยู่บนพื้น
 func _exit_tree() -> void:
 	_collect()
 

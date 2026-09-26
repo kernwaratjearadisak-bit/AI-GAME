@@ -46,8 +46,8 @@ jump={
 [layer_names]
 
 2d_physics/layer_1="ground"
-2d_physics/layer_2="enemies"
-2d_physics/layer_3="heroes"
+2d_physics/layer_2="heroes"
+2d_physics/layer_3="enemies"
 
 [physics]
 

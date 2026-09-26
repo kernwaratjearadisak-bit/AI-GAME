@@ -9,11 +9,14 @@ const BOSS_HP_MULTIPLIER := 2
 # Boss ต้องหยุดที่ ≤ 156 ไม่งั้นยืนตีจากระยะที่ Hero ตีไม่ถึง → ใช้ 150 (เผื่อ 6px)
 # และยัง ≥ 38 + 76 = 114 (ครึ่งกว้าง Hero + Boss) ลำตัวไม่ทับกัน
 const BOSS_STOP_DISTANCE := 150.0
+# ตัวใหญ่ หนักกว่า → ลอยสูงแค่ครึ่งของ Enemy ปกติ (ความสูง ∝ speed² จึงคูณ speed ด้วย sqrt ของอัตราส่วน)
+const BOSS_KNOCKBACK_HOP_HEIGHT_RATIO := 0.5
 
 
 func _ready() -> void:
 	super()
 	stop_distance = BOSS_STOP_DISTANCE
+	knockback_hop_speed = KNOCKBACK_HOP_SPEED * sqrt(BOSS_KNOCKBACK_HOP_HEIGHT_RATIO)
 
 
 # HP x2 ของ Enemy ปกติ แล้ว setup() ค่อยคูณ stage_multiplier ทับ — attack ใช้ BASE_ATTACK เท่า Enemy ปกติ
