@@ -48,6 +48,7 @@ enum MoveMode { NONE, CHASE, FORMATION, RETURN }
 @onready var sight_area: Area2D = $SightArea
 @onready var attack_area: Area2D = $AttackArea
 @onready var selected_indicator: Polygon2D = $SelectedIndicator
+@onready var skills: HeroSkills = $HeroSkills
 
 # max_hp คำนวณจาก VIT เสมอ (_update_max_hp) — ค่าตรงนี้แค่ค่าก่อน _ready
 var hp: float = HeroClasses.BASE_HP
@@ -55,6 +56,8 @@ var max_hp: float = HeroClasses.BASE_HP
 var attack_damage: float = 10.0
 # HeroParty ตั้งก่อน add_child — _ready() ปรับ attack range / interval / tint ตาม HeroClasses
 var hero_class: HeroClasses.HeroClass = HeroClasses.HeroClass.WARRIOR
+# tint ของ class — self_modulate = class_tint * tint ของ skill (เช่น regen) ส่วน modulate ใช้ flash ตอนโดนตี
+var class_tint := Color.WHITE
 # STR / VIT / AGI — สูตรอยู่ใน CombatStats.gd
 @export var strength: int = 10
 @export var vitality: int = 10
@@ -126,6 +129,13 @@ func _physics_process(delta: float) -> void:
 
 	move_velocity_x = 0.0
 	move_mode = MoveMode.NONE
+	# casting lock (HeroSkills): ไม่เดิน ไม่ตีปกติ ไม่หันเอง — animation/การหันเป็นของ skill ทั้งหมด (ยังตก gravity)
+	if skills.is_casting:
+		formation_velocity_x = 0.0
+		velocity.x = 0.0
+		velocity.y += WORLD_SCRIPT.GRAVITY * delta
+		move_and_slide()
+		return
 	_update_ai(delta)
 	if move_mode != MoveMode.FORMATION and move_mode != MoveMode.RETURN:
 		formation_velocity_x = move_velocity_x
@@ -264,7 +274,7 @@ func _attack_current_target() -> void:
 	animated_sprite.play("attack", CombatStats.get_attack_anim_speed(animated_sprite, attack_interval))
 	# STR → สุ่ม ±20% → (ฝั่งที่โดนตี) หัก VIT ใน take_damage
 	if hero_class == HeroClasses.HeroClass.ARCHER:
-		_spawn_arrow(target)
+		spawn_arrow(target)
 	target.take_damage(CombatStats.roll_damage(CombatStats.get_damage_output(attack_damage, strength)))
 	if target.hp > 0 and randf() < HERO_KNOCKBACK_CHANCE:
 		# ผลักแค่แกน X ออกจาก Hero — ยืนตรงกันเป๊ะให้ผลักไปทางขวา
@@ -283,7 +293,8 @@ func take_damage(amount: float) -> void:
 	_flash_hit()
 	if hp <= 0:
 		_die()
-	elif not _is_playing_action("attack"):
+	elif not _is_playing_action("attack") and not skills.is_casting:
+		# ระหว่าง casting ไม่ทับท่าของ skill (เช่น ค้าง frame ชาร์จ)
 		animated_sprite.play("hit")
 
 
@@ -332,7 +343,13 @@ func _apply_hero_class() -> void:
 	var attack_shape: CircleShape2D = attack_collision.shape.duplicate()
 	attack_shape.radius *= config["attack_range_multiplier"]
 	attack_collision.shape = attack_shape
-	animated_sprite.self_modulate = config["tint"]
+	class_tint = config["tint"]
+	set_skill_tint(Color.WHITE)
+
+
+# HeroSkills เรียก — Color.WHITE = ไม่มี effect
+func set_skill_tint(tint: Color) -> void:
+	animated_sprite.self_modulate = class_tint * tint
 
 
 # เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
@@ -349,6 +366,7 @@ func reset_for_new_stage() -> void:
 	enemies_in_sight.clear()
 	enemies_in_attack_range.clear()
 	sight_area.monitoring = true
+	skills.reset_for_new_stage()
 	# _die() ไม่ได้ queue_free แค่ปิด collision / AttackArea — hp เต็มแล้วต้องเปิดคืน ไม่งั้นเดินได้แต่ตีไม่ได้
 	if was_dead:
 		$CollisionShape2D.disabled = false
@@ -415,15 +433,26 @@ func _set_facing_left(left: bool) -> void:
 	animated_sprite.offset = Vector2(-SPRITE_OFFSET.x if left else SPRITE_OFFSET.x, SPRITE_OFFSET.y)
 
 
-# ภาพอย่างเดียว — damage ยังทำทันทีใน _attack_current_target()
-func _spawn_arrow(target: Node2D) -> void:
+# ภาพอย่างเดียว — damage ยังทำทันทีใน _attack_current_target() / HeroSkills (Push Arrow)
+func spawn_arrow(target: Node2D) -> void:
 	var effects := get_tree().get_first_node_in_group("effects")
 	if effects == null:
 		return
+	effects.spawn_arrow(target, get_arrow_release_position())
+
+
+# จุดปล่อยลูกธนูตามทิศที่หันอยู่
+func get_arrow_release_position() -> Vector2:
 	var release_offset := ARROW_RELEASE_OFFSET
 	if animated_sprite.flip_h:
 		release_offset.x = -release_offset.x
-	effects.spawn_arrow(target, global_position + release_offset)
+	return global_position + release_offset
+
+
+# HeroSkills ใช้หันหาเป้าเองระหว่าง casting (AI ไม่หันให้) — x ตรงตัวพอดีไม่เปลี่ยนทิศ
+func face_toward(x: float) -> void:
+	if x != global_position.x:
+		_set_facing_left(x < global_position.x)
 
 
 func _spawn_damage_number(amount: float) -> void:

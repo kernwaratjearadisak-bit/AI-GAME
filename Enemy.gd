@@ -73,6 +73,8 @@ func _get_base_hp() -> float:
 
 func _ready() -> void:
 	z_index = WORLD_SCRIPT.Z_INDEX_ENEMY
+	# HeroSkills (Bash) หาเป้าจาก group นี้ — รวม Boss
+	add_to_group("enemies")
 	_update_attack_interval()
 	var detect_shape: RectangleShape2D = detect_area.get_node("CollisionShape2D").shape
 	detect_shape.size = Vector2(ENEMY_DETECT_RANGE * 2.0, DETECT_AREA_HEIGHT)

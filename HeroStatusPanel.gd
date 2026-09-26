@@ -30,6 +30,7 @@ const TAB_STYLE_COLORS := {
 @onready var vit_plus_button: Button = $VITPlusButton
 @onready var agi_plus_button: Button = $AGIPlusButton
 @onready var class_label: Label = $ClassLabel
+@onready var skill_label: Label = $SkillLabel
 @onready var recruit_warrior_button: Button = $RecruitWarriorButton
 @onready var recruit_archer_button: Button = $RecruitArcherButton
 
@@ -68,6 +69,7 @@ func _process(_delta: float) -> void:
 		str_label.text = "STR: %d" % leader.strength
 		vit_label.text = "VIT: %d" % leader.vitality
 		agi_label.text = "AGI: %d" % leader.agility
+		skill_label.text = _get_skill_text(leader.skills)
 
 	# ไม่มี leader หรือ coin กองกลางไม่พอ = กดไม่ได้
 	var hero_party := get_tree().get_first_node_in_group("hero_party")
@@ -85,6 +87,24 @@ func _process(_delta: float) -> void:
 		heroes_label.text = "Heroes: %d/%d" % [hero_count, MAX_HEROES]
 	recruit_warrior_button.disabled = is_full
 	recruit_archer_button.disabled = is_full
+
+
+# "Bash: 12s   Regen: Active (3/5)" / "Charge: Charging…   Push: 2/3" — class ที่ไม่มี skill แสดง "Skill: —"
+func _get_skill_text(skills: HeroSkills) -> String:
+	if not skills.has_skills():
+		return "Skill: —"
+	var parts: Array[String] = []
+	for skill_id in skills.skill_ids:
+		var skill_name: String = SkillData.get_config(skill_id)["short_name"]
+		var cooldown := skills.get_cooldown(skill_id)
+		var active_status := skills.get_active_status(skill_id)
+		if active_status != "":
+			parts.append("%s: %s" % [skill_name, active_status])
+		elif cooldown > 0.0:
+			parts.append("%s: %ds" % [skill_name, ceili(cooldown)])
+		else:
+			parts.append("%s: Ready" % skill_name)
+	return "   ".join(parts)
 
 
 # อ่านใหม่ทุกเฟรม — Hero ที่เพิ่ง recruit / ตาย / ฟื้นตอน reset stage อัปเดตทันที

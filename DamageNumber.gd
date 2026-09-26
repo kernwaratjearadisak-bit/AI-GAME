@@ -11,7 +11,12 @@ const FADE_START := 0.9
 
 # เรียกหลัง add_child และตั้ง global_position แล้ว (tween ลอยขึ้นจากตำแหน่งปัจจุบัน)
 func setup(amount: float, color: Color) -> void:
-	label.text = "%.2f" % amount
+	setup_text("%.2f" % amount, color)
+
+
+# ข้อความอิสระ เช่น "+5" ของ Regenerate HP — ลอยขึ้น/จางเหมือนตัวเลข damage
+func setup_text(text: String, color: Color) -> void:
+	label.text = text
 	label.add_theme_color_override("font_color", color)
 
 	var tween := create_tween().set_parallel()

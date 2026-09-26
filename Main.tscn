@@ -248,6 +248,14 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 32
 text = "+"
 
+[node name="SkillLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(20, 310)
+size = Vector2(680, 34)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 0.9, 0.5, 1)
+text = "Skill: —"
+
 [node name="RecruitWarriorButton" type="Button" parent="UI/HeroStatusPanel"]
 position = Vector2(20, 348)
 size = Vector2(330, 80)

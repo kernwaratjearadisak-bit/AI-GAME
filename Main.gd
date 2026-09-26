@@ -29,8 +29,10 @@ const STAGE_SCALING := 1.5
 const STAGE_TITLE_FADE_IN := 0.3
 const STAGE_TITLE_HOLD := 1.2
 const STAGE_TITLE_FADE_OUT := 0.5
-# TODO: ปุ่ม debug ชั่วคราว — B = Boss ตายทันที, V = ย้าย Boss มาข้างหน้า leader ปิดเป็น false ก่อน release
+# TODO: ปุ่ม debug ชั่วคราว — B = Boss ตายทันที, V = ย้าย Boss มาข้างหน้า leader
+# K = cooldown ทุก skill ของ Hero ที่เลือกเป็น 0, H = HP ของ Hero ที่เลือกเหลือ DEBUG_LOW_HP_RATIO — ปิดเป็น false ก่อน release
 const DEBUG_BOSS_KEYS := true
+const DEBUG_LOW_HP_RATIO := 0.4
 const DEBUG_BOSS_NEAR_OFFSET := Vector2(500, 0)
 
 # จุดศูนย์กลางกลุ่ม Enemy (พิกัด World) — แต่ละจุด spawn ENEMIES_PER_GROUP ตัวรอบๆ
@@ -186,6 +188,14 @@ func show_stage_title(stage_number: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not DEBUG_BOSS_KEYS or not (event is InputEventKey and event.pressed and not event.echo):
 		return
+	var selected_hero := get_tree().get_first_node_in_group("party_leader")
+	if selected_hero and selected_hero.hp > 0:
+		if event.keycode == KEY_K:
+			selected_hero.skills.debug_clear_cooldowns()
+			return
+		if event.keycode == KEY_H:
+			selected_hero.hp = snappedf(selected_hero.max_hp * DEBUG_LOW_HP_RATIO, 0.01)
+			return
 	if not is_instance_valid(boss) or boss.hp <= 0:
 		return
 	if event.keycode == KEY_B:
