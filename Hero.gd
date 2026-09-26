@@ -2,7 +2,6 @@ extends CharacterBody2D
 
 enum HeroState { SEEKING, FIGHTING, RETURNING }
 
-const SELECT_HALF_SIZE := Vector2(120, 160)
 const RETURN_LEASH_RANGE := 300.0
 # เมื่อเข้า RETURNING แล้ว ให้เดินกลับจนเข้าใกล้ formation slot ระยะนี้ก่อนค่อยกลับไปหา Enemy
 # slot ไกลสุดห่าง leader 3 * FORMATION_SPACING = 210 → หยุดที่ ≤ 260 จาก leader ยังต่ำกว่า RETURN_LEASH_RANGE (300)
@@ -50,8 +49,9 @@ enum MoveMode { NONE, CHASE, FORMATION, RETURN }
 @onready var attack_area: Area2D = $AttackArea
 @onready var selected_indicator: Polygon2D = $SelectedIndicator
 
-var hp: float = 100.0
-var max_hp: float = 100.0
+# max_hp คำนวณจาก VIT เสมอ (_update_max_hp) — ค่าตรงนี้แค่ค่าก่อน _ready
+var hp: float = HeroClasses.BASE_HP
+var max_hp: float = HeroClasses.BASE_HP
 var attack_damage: float = 10.0
 # HeroParty ตั้งก่อน add_child — _ready() ปรับ attack range / interval / tint ตาม HeroClasses
 var hero_class: HeroClasses.HeroClass = HeroClasses.HeroClass.WARRIOR
@@ -93,6 +93,8 @@ func _ready() -> void:
 	z_index = WORLD_SCRIPT.Z_INDEX_HERO
 	_apply_hero_class()
 	_update_attack_interval()
+	_update_max_hp()
+	hp = max_hp
 	animated_sprite.play("idle")
 	var sight_shape: RectangleShape2D = sight_area.get_node("CollisionShape2D").shape
 	sight_shape.size = Vector2(HERO_DETECT_RANGE * 2.0, DETECT_AREA_HEIGHT)
@@ -116,22 +118,6 @@ func select() -> void:
 	selected_indicator.visible = true
 	state = HeroState.SEEKING
 	sight_area.monitoring = true
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	var click_pos: Vector2
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		click_pos = event.position
-	elif event is InputEventScreenTouch and event.pressed:
-		click_pos = event.position
-	else:
-		return
-
-	# event.position เป็นพิกัดจอ ต้องแปลงเป็นพิกัด World ก่อน เพราะกล้องขยับแล้ว
-	click_pos = get_canvas_transform().affine_inverse() * click_pos
-	print("Hero _unhandled_input click at ", click_pos, " checking ", name, " at ", global_position)
-	if absf(click_pos.x - global_position.x) <= SELECT_HALF_SIZE.x and absf(click_pos.y - global_position.y) <= SELECT_HALF_SIZE.y:
-		select()
 
 
 func _physics_process(delta: float) -> void:
@@ -313,11 +299,20 @@ func try_upgrade_stat(stat_name: StringName) -> bool:
 		&"strength":
 			strength += 1
 		&"vitality":
+			# HP ปัจจุบันเพิ่มเท่ากับ HP Max ที่เพิ่ม → HP% ไม่ลดตอนอัป (ตายแล้วไม่ชุบ)
+			var old_max_hp := max_hp
 			vitality += 1
+			_update_max_hp()
+			if hp > 0:
+				hp = snappedf(hp + max_hp - old_max_hp, 0.01)
 		&"agility":
 			# setter ของ agility คำนวณ attack_interval ใหม่จาก base_attack_interval ให้ทันที
 			agility += 1
 	return true
+
+
+func _update_max_hp() -> void:
+	max_hp = snappedf(CombatStats.get_max_hp(HeroClasses.BASE_HP, vitality, HeroClasses.BASE_VITALITY), 0.01)
 
 
 func _update_attack_interval() -> void:
@@ -343,6 +338,7 @@ func _apply_hero_class() -> void:
 # เรียกจาก HeroParty ตอนเริ่ม stage ใหม่ — เก็บ recruit_index ไว้ ส่วนตำแหน่ง HeroParty เป็นคนวาง
 func reset_for_new_stage() -> void:
 	var was_dead := hp <= 0
+	_update_max_hp()
 	hp = max_hp
 	state = HeroState.SEEKING
 	move_velocity_x = 0.0
@@ -363,6 +359,10 @@ func reset_for_new_stage() -> void:
 # _physics_process หยุด AI/การเดินเองเมื่อ hp <= 0 — ตรงนี้ปิด collision/area แล้วรอ death เล่นจบ
 func _die() -> void:
 	velocity = Vector2.ZERO
+	# leader ตาย → HeroParty เลือกตัวที่ยังมีชีวิตซึ่ง recruit_index น้อยสุดแทน (ตายหมดไม่ทำอะไร)
+	var hero_party := get_tree().get_first_node_in_group("hero_party")
+	if hero_party:
+		hero_party.on_hero_died(self)
 	$CollisionShape2D.set_deferred("disabled", true)
 	sight_area.set_deferred("monitoring", false)
 	attack_area.set_deferred("monitoring", false)

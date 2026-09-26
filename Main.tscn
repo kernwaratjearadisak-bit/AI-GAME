@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://cf7lvh2v7xwfq"]
+[gd_scene load_steps=10 format=3 uid="uid://cf7lvh2v7xwfq"]
 
 [ext_resource type="Script" path="res://World.gd" id="2"]
 [ext_resource type="Script" path="res://Background.gd" id="3"]
@@ -8,12 +8,15 @@
 [ext_resource type="Script" path="res://HeroParty.gd" id="7"]
 [ext_resource type="Script" path="res://CameraFollow.gd" id="8"]
 [ext_resource type="Script" path="res://Effects.gd" id="9"]
+[ext_resource type="PackedScene" path="res://ParallaxBackground.tscn" id="10"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("4")
 
 [node name="World" type="Node2D" parent="."]
 script = ExtResource("2")
+
+[node name="ParallaxBackground" parent="World" instance=ExtResource("10")]
 
 [node name="Background" type="Node2D" parent="World"]
 script = ExtResource("3")
@@ -38,28 +41,22 @@ size = Vector2(720, 192)
 color = Color(0.05, 0.08, 0.3, 0.75)
 script = ExtResource("5")
 
-[node name="HPLabel" type="Label" parent="UI/ResourceBar"]
-position = Vector2(20, 71)
-size = Vector2(300, 50)
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "HP: 100/100"
+[node name="StagePassLabel" type="Label" parent="UI/ResourceBar"]
+position = Vector2(20, 66)
+size = Vector2(340, 60)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
+text = "Stage pass: 0"
 
 [node name="CoinLabel" type="Label" parent="UI/ResourceBar"]
-position = Vector2(400, 71)
-size = Vector2(300, 50)
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+position = Vector2(360, 66)
+size = Vector2(340, 60)
 horizontal_alignment = 2
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
 text = "Coin: 0"
-
-[node name="StagePassLabel" type="Label" parent="UI/ResourceBar"]
-position = Vector2(20, 12)
-size = Vector2(680, 50)
-theme_override_font_sizes/font_size = 32
-theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
-horizontal_alignment = 1
-text = "Stage pass: 0"
 
 [node name="BattleZone" type="ColorRect" parent="UI"]
 mouse_filter = 2
@@ -74,107 +71,196 @@ size = Vector2(720, 448)
 color = Color(0.12, 0.12, 0.12, 0.9)
 script = ExtResource("6")
 
+[node name="HeroTab0" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(0, 0)
+size = Vector2(180, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "—"
+
+[node name="HPBarBack" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab0"]
+mouse_filter = 2
+position = Vector2(14, 58)
+size = Vector2(152, 10)
+color = Color(0.05, 0.05, 0.05, 1)
+
+[node name="HPBarFill" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab0/HPBarBack"]
+mouse_filter = 2
+position = Vector2(0, 0)
+size = Vector2(0, 10)
+color = Color(0.35, 0.85, 0.35, 1)
+
+[node name="HeroTab1" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(180, 0)
+size = Vector2(180, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "—"
+
+[node name="HPBarBack" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab1"]
+mouse_filter = 2
+position = Vector2(14, 58)
+size = Vector2(152, 10)
+color = Color(0.05, 0.05, 0.05, 1)
+
+[node name="HPBarFill" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab1/HPBarBack"]
+mouse_filter = 2
+position = Vector2(0, 0)
+size = Vector2(0, 10)
+color = Color(0.35, 0.85, 0.35, 1)
+
+[node name="HeroTab2" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(360, 0)
+size = Vector2(180, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "—"
+
+[node name="HPBarBack" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab2"]
+mouse_filter = 2
+position = Vector2(14, 58)
+size = Vector2(152, 10)
+color = Color(0.05, 0.05, 0.05, 1)
+
+[node name="HPBarFill" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab2/HPBarBack"]
+mouse_filter = 2
+position = Vector2(0, 0)
+size = Vector2(0, 10)
+color = Color(0.35, 0.85, 0.35, 1)
+
+[node name="HeroTab3" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(540, 0)
+size = Vector2(180, 80)
+focus_mode = 0
+theme_override_font_sizes/font_size = 24
+text = "—"
+
+[node name="HPBarBack" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab3"]
+mouse_filter = 2
+position = Vector2(14, 58)
+size = Vector2(152, 10)
+color = Color(0.05, 0.05, 0.05, 1)
+
+[node name="HPBarFill" type="ColorRect" parent="UI/HeroStatusPanel/HeroTab3/HPBarBack"]
+mouse_filter = 2
+position = Vector2(0, 0)
+size = Vector2(0, 10)
+color = Color(0.35, 0.85, 0.35, 1)
+
+[node name="ClassLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(20, 92)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Class: Warrior"
+
+[node name="HPLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(20, 128)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(0.5, 1, 0.5, 1)
+text = "HP: 100.00/100.00"
+
 [node name="ATKLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 65)
-size = Vector2(300, 40)
-theme_override_font_sizes/font_size = 28
+position = Vector2(20, 164)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "ATK: 10"
 
 [node name="HPMaxLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 110)
-size = Vector2(300, 40)
-theme_override_font_sizes/font_size = 28
+position = Vector2(20, 200)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "HP Max: 100"
 
 [node name="AttackSpeedLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 155)
-size = Vector2(300, 40)
-theme_override_font_sizes/font_size = 28
+position = Vector2(20, 236)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 text = "Attack interval: 0.77s"
 
 [node name="HeroesLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 200)
-size = Vector2(300, 40)
-theme_override_font_sizes/font_size = 28
+position = Vector2(20, 272)
+size = Vector2(340, 36)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Heroes: 2/4"
+text = "Heroes: 1/4"
 
-[node name="ClassLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 20)
-size = Vector2(300, 40)
-theme_override_font_sizes/font_size = 28
+[node name="STRLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 92)
+size = Vector2(220, 48)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Class: Warrior"
+text = "STR: 10"
+
+[node name="VITLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 146)
+size = Vector2(220, 48)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "VIT: 10"
+
+[node name="AGILabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 200)
+size = Vector2(220, 48)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "AGI: 10"
+
+[node name="DEFLabel" type="Label" parent="UI/HeroStatusPanel"]
+position = Vector2(380, 254)
+size = Vector2(220, 48)
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "DEF: 9.09%"
+
+[node name="STRPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(628, 92)
+size = Vector2(48, 48)
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "+"
+
+[node name="VITPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(628, 146)
+size = Vector2(48, 48)
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "+"
+
+[node name="AGIPlusButton" type="Button" parent="UI/HeroStatusPanel"]
+position = Vector2(628, 200)
+size = Vector2(48, 48)
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "+"
 
 [node name="RecruitWarriorButton" type="Button" parent="UI/HeroStatusPanel"]
-position = Vector2(20, 320)
+position = Vector2(20, 348)
 size = Vector2(330, 80)
 focus_mode = 0
 theme_override_font_sizes/font_size = 30
 text = "Recruit Warrior"
 
 [node name="RecruitArcherButton" type="Button" parent="UI/HeroStatusPanel"]
-position = Vector2(370, 320)
+position = Vector2(370, 348)
 size = Vector2(330, 80)
 focus_mode = 0
 theme_override_font_sizes/font_size = 30
 text = "Recruit Archer"
-
-[node name="STRLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 10)
-size = Vector2(220, 64)
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "STR: 10"
-
-[node name="VITLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 84)
-size = Vector2(220, 64)
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "VIT: 10"
-
-[node name="AGILabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 158)
-size = Vector2(220, 64)
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "AGI: 10"
-
-[node name="DEFLabel" type="Label" parent="UI/HeroStatusPanel"]
-position = Vector2(380, 232)
-size = Vector2(220, 64)
-vertical_alignment = 1
-theme_override_font_sizes/font_size = 28
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "DEF: 9.09%"
-
-[node name="STRPlusButton" type="Button" parent="UI/HeroStatusPanel"]
-focus_mode = 0
-position = Vector2(620, 10)
-size = Vector2(64, 64)
-theme_override_font_sizes/font_size = 36
-text = "+"
-
-[node name="VITPlusButton" type="Button" parent="UI/HeroStatusPanel"]
-focus_mode = 0
-position = Vector2(620, 84)
-size = Vector2(64, 64)
-theme_override_font_sizes/font_size = 36
-text = "+"
-
-[node name="AGIPlusButton" type="Button" parent="UI/HeroStatusPanel"]
-focus_mode = 0
-position = Vector2(620, 158)
-size = Vector2(64, 64)
-theme_override_font_sizes/font_size = 36
-text = "+"
 
 [node name="StageTitleLabel" type="Label" parent="UI"]
 visible = false

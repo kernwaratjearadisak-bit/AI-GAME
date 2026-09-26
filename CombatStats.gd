@@ -7,6 +7,8 @@ extends RefCounted
 const STR_DAMAGE_PER_POINT := 0.05
 # VIT: ลด damage แบบ diminishing — VIT เท่ากับค่านี้ = ลด 50% และไม่มีวันถึง 100%
 const VIT_REDUCTION_CONSTANT := 100.0
+# VIT: HP Max เพิ่มแต้มละเท่านี้ นับจาก base_vitality (VIT = base → HP Max = base_hp)
+const VIT_HP_PER_POINT := 5.0
 # AGI: ความเร็วโจมตีเพิ่ม 3% ต่อแต้ม แต่ interval ไม่ต่ำกว่า MIN_ATTACK_INTERVAL
 const AGI_SPEED_PER_POINT := 0.03
 const MIN_ATTACK_INTERVAL := 0.25
@@ -29,6 +31,10 @@ static func get_damage_reduction(vitality: float) -> float:
 
 static func get_damage_received(incoming: float, vitality: float) -> float:
 	return snappedf(incoming * (1.0 - get_damage_reduction(vitality)), 0.01)
+
+
+static func get_max_hp(base_hp: float, vitality: float, base_vitality: float) -> float:
+	return base_hp + (vitality - base_vitality) * VIT_HP_PER_POINT
 
 
 static func get_attack_interval(base_interval: float, agility: float) -> float:

@@ -4,36 +4,46 @@ const MOVE_DURATION := 0.4
 const HP_POTION_HEAL_AMOUNT := 15.0
 
 var start_position := Vector2.ZERO
+# ล็อกตอนเริ่มลอย — เปลี่ยนเฉพาะตอนเป้าตาย/ถูกลบก่อนถึง (ไม่สลับกลางทางตาม HP% ที่เปลี่ยน จะได้ไม่ลอยส่าย)
+var target_hero: Node2D = null
+var move_tween: Tween = null
 
 
 func _fly_to_target() -> void:
-	if _find_selected_hero() == null:
+	_retarget()
+
+
+# หาเป้าใหม่ด้วย HeroParty.get_lowest_hp_hero() แล้วลอยจากตำแหน่งปัจจุบัน — ไม่เหลือใครให้หาย
+func _retarget() -> void:
+	if move_tween and move_tween.is_valid():
+		move_tween.kill()
+	var hero_party := get_tree().get_first_node_in_group("hero_party")
+	target_hero = hero_party.get_lowest_hp_hero() if hero_party else null
+	if target_hero == null:
 		queue_free()
 		return
-
-	# ไล่ตามตำแหน่งปัจจุบันของ Hero ที่ถูกเลือกทุกเฟรม (Hero เดินอยู่ ถ้าล็อกเป้าไว้ตั้งแต่แรกจะไปไม่ถึงตัว)
+	# ไล่ตามตำแหน่งปัจจุบันของเป้าทุกเฟรม (Hero เดินอยู่ ถ้าล็อกจุดไว้ตั้งแต่แรกจะไปไม่ถึงตัว)
 	start_position = global_position
-	var tween := create_tween()
-	tween.tween_method(_move_toward_selected_hero, 0.0, 1.0, MOVE_DURATION)
-	tween.finished.connect(_on_arrived)
+	move_tween = create_tween()
+	move_tween.tween_method(_move_toward_target, 0.0, 1.0, MOVE_DURATION)
+	move_tween.finished.connect(_on_arrived)
 
 
-func _find_selected_hero() -> Node2D:
-	for hero in get_tree().get_nodes_in_group("heroes"):
-		if hero.is_selected:
-			return hero
-	return null
+func _is_target_alive() -> bool:
+	return is_instance_valid(target_hero) and target_hero.hp > 0
 
 
-func _move_toward_selected_hero(weight: float) -> void:
-	var hero := _find_selected_hero()
-	if hero:
-		global_position = start_position.lerp(hero.global_position, weight)
+func _move_toward_target(weight: float) -> void:
+	if not _is_target_alive():
+		_retarget.call_deferred()
+		return
+	global_position = start_position.lerp(target_hero.global_position, weight)
 
 
+# heal เป้าที่ล็อกไว้ (HP% ต่ำสุดตอนเริ่มลอย) — เกิน max_hp ก็ clamp ทิ้ง potion ไม่เก็บไว้
 func _on_arrived() -> void:
-	# restore เฉพาะ Hero ที่ is_selected ตอนถึงตัวเท่านั้น และไม่ชุบชีวิต Hero ที่ตายไปแล้ว
-	var hero := _find_selected_hero()
-	if hero and hero.hp > 0:
-		hero.hp = snappedf(minf(hero.hp + HP_POTION_HEAL_AMOUNT, hero.max_hp), 0.01)
+	if not _is_target_alive():
+		_retarget()
+		return
+	target_hero.hp = snappedf(minf(target_hero.hp + HP_POTION_HEAL_AMOUNT, target_hero.max_hp), 0.01)
 	queue_free()

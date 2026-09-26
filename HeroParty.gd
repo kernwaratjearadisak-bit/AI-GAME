@@ -97,6 +97,41 @@ func recruit_hero(hero_class: HeroClasses.HeroClass) -> void:
 	WORLD_SCRIPT.place_on_ground(hero, spawn_position.x)
 
 
+# Hero ที่ recruit_index == index (Hero ไม่ถูก queue_free ตอนตาย จึงยังเจอตัวที่ตายอยู่) — ไม่มีคืน null
+func get_hero_by_index(index: int) -> Node2D:
+	for hero in get_tree().get_nodes_in_group("heroes"):
+		if hero.recruit_index == index:
+			return hero
+	return null
+
+
+# Hero._die() เรียก — ถ้าตัวที่ตายเป็นตัวที่เลือกอยู่ ให้เลือกตัวที่ยังมีชีวิตซึ่ง recruit_index น้อยสุดแทน
+# ตายหมดแล้วไม่ทำอะไร (leader ที่ตายยังอยู่ใน group party_leader ตาม logic เดิม)
+func on_hero_died(hero: Node2D) -> void:
+	if not hero.is_selected:
+		return
+	for index in next_recruit_index:
+		var candidate := get_hero_by_index(index)
+		if candidate and candidate.hp > 0:
+			candidate.select()
+			return
+
+
+# Hero ที่ยังมีชีวิตซึ่ง HP% (hp / max_hp) ต่ำสุด — HP% เท่ากันเลือกตัวที่ recruit ก่อน, ไม่เหลือใครคืน null
+# ทุกตัวเลือดเต็มก็ยังคืนตัวตามกฎนี้ (ผู้เรียกตัดสินเองว่าจะทำอะไร)
+func get_lowest_hp_hero() -> Node2D:
+	var best: Node2D = null
+	var best_ratio := INF
+	for hero in get_tree().get_nodes_in_group("heroes"):
+		if hero.hp <= 0 or hero.is_queued_for_deletion():
+			continue
+		var ratio: float = hero.hp / hero.max_hp
+		if ratio < best_ratio or (ratio == best_ratio and hero.recruit_index < best.recruit_index):
+			best_ratio = ratio
+			best = hero
+	return best
+
+
 func add_coins(amount: int) -> void:
 	party_coins += amount
 	coins_changed.emit(party_coins)
